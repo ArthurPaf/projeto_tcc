@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from ..database import get_db
+from ..seguranca import get_current_user
 from . import models
 from .schemas import EventoAtualizar, EventoCriar, EventoPublico
 
-router = APIRouter(prefix="/eventos", tags=["Eventos"])
+router = APIRouter(prefix="/eventos", tags=["Eventos"],
+    dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[EventoPublico])
