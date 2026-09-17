@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .database import Base, engine
 from .eventos import controller as eventos_controller
 from .eventos.erros import ErroDeEvento, ErroDeEvento, EventoNaoEncontrado
 from .usuarios import controller as usuarios_controller
@@ -10,7 +9,7 @@ from .usuarios.erros import CredenciaisInvalidas, ErroDeUsuario
 # So' para a aula: cria as tabelas que ainda nao existem ao subir -- e agora
 # ha' uma nova, usuarios. Ele NAO sabe alterar uma tabela que ja' existe:
 # esse e' o assunto da pagina de migracoes (Alembic).
-Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="API do Meu Projeto", version="0.4.0")
 app.include_router(usuarios_controller.router)

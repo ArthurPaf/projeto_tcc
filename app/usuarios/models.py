@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 
 from ..database import Base
 
@@ -17,3 +18,5 @@ class Usuario(Base):
     nome = Column(String(80), nullable=False)
     email = Column(String(120), nullable=False, unique=True, index=True)
     senha_hash = Column(String(100), nullable=False)
+
+    eventos = relationship("Evento", back_populates="dono")
