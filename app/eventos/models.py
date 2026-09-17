@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import relationship
 from ..database import Base
 
 
@@ -15,6 +16,8 @@ class Evento(Base):
     data_inicio = Column(String(20), nullable=False)
     data_fim = Column(String(20), nullable=False)
     local = Column(String(50), nullable=False)
+    dono_id = Column(Integer, ForeignKey("usuarios.id", name="fk_eventos_dono"), nullable=True)
+    dono = relationship("Usuario", back_populates="eventos")
 
 def listar(db: Session):
     return db.query(Evento).all()
