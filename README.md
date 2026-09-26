@@ -62,3 +62,13 @@ poetry run uvicorn app.main:app --reload
 ```
 
 O `upgrade head` aplica as migrações necessárias para estruturar o banco de dados (PostgreSQL), incluindo o relacionamento do `dono_id`. Depois, abra a documentação interativa em <http://127.0.0>.
+
+## Como rodar o app
+
+Suba a API antes (ela precisa estar na porta 8000).
+
+```
+cd frontend
+flutter pub get
+flutter run -d chrome
+```
