@@ -5,6 +5,7 @@ from .eventos import controller as eventos_controller
 from .eventos.erros import ErroDeEvento, ErroDeEvento, EventoNaoEncontrado
 from .usuarios import controller as usuarios_controller
 from .usuarios.erros import CredenciaisInvalidas, ErroDeUsuario
+from fastapi.middleware.cors import CORSMiddleware
 
 # So' para a aula: cria as tabelas que ainda nao existem ao subir -- e agora
 # ha' uma nova, usuarios. Ele NAO sabe alterar uma tabela que ja' existe:
@@ -12,6 +13,12 @@ from .usuarios.erros import CredenciaisInvalidas, ErroDeUsuario
 
 
 app = FastAPI(title="API do Meu Projeto", version="0.4.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(usuarios_controller.router)
 app.include_router(eventos_controller.router)
 
