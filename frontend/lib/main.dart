@@ -1,30 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import 'repositories/usuario_repository.dart';
 import 'routes.dart';
 import 'screens/cadastro_screen.dart';
 import 'screens/inicio_screen.dart';
+import 'screens/eventos_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/perfil_screen.dart';
 import 'services/sessao_service.dart';
-// Aqui as camadas se montam, como o main.py monta a API no backend:
-// o repositório entra no service, e o service entra nas telas.
+import 'widgets/rota_protegida.dart';
+
+// Aqui as camadas se montam, como o main.py monta a API no backend: o
+// repositório entra no service, e o service fica no topo do app, onde toda
+// tela o alcança, sem passar de construtor em construtor.
 void main() {
-  final sessao = SessaoService(UsuarioRepository());
-  runApp(BibliotecaApp(sessao: sessao));
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => SessaoService(UsuarioRepository()),
+      child: const EventosApp(),
+    ),
+  );
 }
-class BibliotecaApp extends StatelessWidget {
-  const BibliotecaApp({super.key, required this.sessao});
-  final SessaoService sessao;
+
+class EventosApp extends StatelessWidget {
+  const EventosApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Biblioteca',
+      title: 'Eventos',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
       initialRoute: AppRoutes.login,
       routes: {
-        AppRoutes.login: (context) => LoginScreen(sessao: sessao),
+        AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.cadastro: (context) => const CadastroScreen(),
-        AppRoutes.inicio: (context) => InicioScreen(sessao: sessao),
+        AppRoutes.inicio: (context) => const RotaProtegida(tela: InicioScreen()),
+        AppRoutes.eventos: (context) => const RotaProtegida(tela: EventosScreen()),
+        AppRoutes.perfil: (context) => const RotaProtegida(tela: PerfilScreen()),
       },
     );
   }
