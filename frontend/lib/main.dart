@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
-
 import 'repositories/usuario_repository.dart';
+import 'routes.dart';
+import 'screens/cadastro_screen.dart';
+import 'screens/inicio_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/sessao_service.dart';
-
 // Aqui as camadas se montam, como o main.py monta a API no backend:
 // o repositório entra no service, e o service entra nas telas.
 void main() {
   final sessao = SessaoService(UsuarioRepository());
-  runApp(EventoApp(sessao: sessao));
+  runApp(BibliotecaApp(sessao: sessao));
 }
-
-class EventoApp extends StatelessWidget {
-  const EventoApp({super.key, required this.sessao});
-
+class BibliotecaApp extends StatelessWidget {
+  const BibliotecaApp({super.key, required this.sessao});
   final SessaoService sessao;
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Eventos',
+      title: 'Biblioteca',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.indigo),
-      home: LoginScreen(sessao: sessao),
+      initialRoute: AppRoutes.login,
+      routes: {
+        AppRoutes.login: (context) => LoginScreen(sessao: sessao),
+        AppRoutes.cadastro: (context) => const CadastroScreen(),
+        AppRoutes.inicio: (context) => InicioScreen(sessao: sessao),
+      },
     );
   }
 }

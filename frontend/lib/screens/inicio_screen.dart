@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/usuario.dart';
+import '../routes.dart';
 import '../services/sessao_service.dart';
-import 'login_screen.dart';
 
 // A tela inicial: pede ao service quem está logado. O token mora na sessão.
 class InicioScreen extends StatefulWidget {
@@ -33,9 +33,10 @@ class _InicioScreenState extends State<InicioScreen> {
 
   void sair() {
     widget.sessao.sair();
-    Navigator.pushReplacement(
+    Navigator.pushNamedAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginScreen(sessao: widget.sessao)),
+      AppRoutes.login,
+      (rota) => false,
     );
   }
 
