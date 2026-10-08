@@ -26,8 +26,8 @@ class AppDrawer extends StatelessWidget {
             onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.inicio),
           ),
           ListTile(
-            leading: const Icon(Icons.event),
-            title: const Text('Eventos'),
+            leading: const Icon(Icons.menu_book),
+            title: const Text('Livros'),
             onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.eventos),
           ),
           ListTile(
@@ -39,8 +39,9 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
-            onTap: () {
-              context.read<SessaoService>().sair();
+            onTap: () async {
+              await context.read<SessaoService>().sair();
+              if (!context.mounted) return;
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.login,
