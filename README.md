@@ -81,3 +81,5 @@ O cadastro chama `POST /usuarios/` pelas mesmas camadas do login e já entra com
 
 O token fica no aparelho (`shared_preferences`, que no navegador é o `localStorage`), num repositório próprio, o `TokenRepository`. O `main` o restaura antes de abrir o app: se a API ainda o aceita, o F5 não derruba a sessão. O Sair apaga o token.
 
+A tela de eventos chama GET /eventos/ pelas camadas do aplicativo (tela, EventoService, EventoRepository), com o token no cabeçalho, e mostra apenas os eventos de quem está logado, exibindo nome, local, data de início e data de fim. Ela possui quatro estados: carregando, erro (com botão Tentar de novo), lista vazia e listagem dos eventos.
+Ao tocar em um evento, o aplicativo abre a tela de detalhes pela rota /evento, passando o ID nos arguments. A tela consulta a API (GET /eventos/{id}) para buscar e apresentar os dados atualizados do evento.
