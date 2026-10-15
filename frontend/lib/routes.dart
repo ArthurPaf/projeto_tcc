@@ -3,5 +3,6 @@ class AppRoutes {
   static const cadastro = '/cadastro';
   static const inicio = '/inicio';
   static const eventos = '/eventos';
+  static const evento = '/evento';
   static const perfil = '/perfil';
 }

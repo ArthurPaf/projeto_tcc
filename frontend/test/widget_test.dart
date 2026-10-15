@@ -1,21 +1,25 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/screens/eventos_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/main.dart';
+import 'package:frontend/models/Evento.dart';
+import 'package:frontend/repositories/evento_repository.dart';
 import 'package:frontend/repositories/usuario_repository.dart';
 import 'package:frontend/routes.dart';
 import 'package:frontend/screens/cadastro_screen.dart';
 import 'package:frontend/screens/inicio_screen.dart';
+import 'package:frontend/screens/evento_screen.dart';
 import 'package:frontend/screens/eventos_screen.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/screens/perfil_screen.dart';
+import 'package:frontend/services/evento_service.dart';
 import 'package:frontend/services/sessao_service.dart';
 
 // Uma API de mentira, com um banco de mentira (o Map contas): responde como a
@@ -29,7 +33,7 @@ int pedidos = 0;
 SessaoService sessaoDeMentira({Map<String, Object> guardado = const {}}) {
   SharedPreferences.setMockInitialValues(guardado);
   final contas = {
-    'ana@biblioteca.com': {'nome': 'Ana', 'senha': 'segredo123'},
+    'ana@eventos.com': {'nome': 'Ana', 'senha': 'segredo123'},
   };
   final cliente = MockClient((pedido) async {
     pedidos++;
@@ -87,14 +91,50 @@ SessaoService sessaoDeMentira({Map<String, Object> guardado = const {}}) {
   return SessaoService(UsuarioRepository(cliente: cliente));
 }
 
-// O app de verdade, com a sessão de mentira no topo, como o main.dart faz.
+// Dois eventos fictícios, com os campos de nome, local e datas.
+const doisEventos = [
+  {'id': 1, 'nome': 'Feira de Tecnologia', 'local': 'Centro de Eventos', 'data_inicio': '2026-10-20', 'data_fim': '2026-10-22'},
+  {'id': 2, 'nome': 'Mostra Cultural', 'local': 'Auditório Municipal', 'data_inicio': '2026-11-05', 'data_fim': '2026-11-06'},
+];
+
+// A API de eventos de mentira: o GET /eventos/ responde com este status e este
+// corpo. Como a de verdade, sem o token no cabeçalho ela responde 401. O
+// GET /eventos/{id} procura o evento entre os dois exemplos; outro id, 404.
+http.Client apiDeEventos(int status, Object corpo) {
+  return MockClient((pedido) async {
+    pedidos++;
+    if (pedido.headers['Authorization'] == null) {
+      return http.Response('{"detail": "Not authenticated"}', 401);
+    }
+    final id = pedido.url.pathSegments.last; // '' em /eventos/, '2' em /eventos/2
+    if (id.isNotEmpty) {
+      for (final evento in doisEventos) {
+        if ('${evento['id']}' == id) {
+          return http.Response(jsonEncode(evento), 200);
+        }
+      }
+      return http.Response('{"detail": "Evento $id nao foi encontrado"}', 404);
+    }
+    return http.Response(jsonEncode(corpo), status);
+  });
+}
+
+// O app de verdade, com os services de mentira no topo, como o main.dart faz.
 // O .value entrega ao Provider um objeto que já existe, em vez de criá-lo.
-Widget appDeMentira(SessaoService sessao) {
-  return ChangeNotifierProvider.value(value: sessao, child: const EventoApp());
+// Sem a API de eventos, a de mentira responde uma lista vazia.
+Widget appDeMentira(SessaoService sessao, {http.Client? eventos}) {
+  final repositorio = EventoRepository(cliente: eventos ?? apiDeEventos(200, []));
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: sessao),
+      Provider.value(value: EventoService(repositorio, sessao)),
+    ],
+    child: const BibliotecaApp(),
+  );
 }
 
 Future<void> preencherEEntrar(WidgetTester tester, String senha) async {
-  await tester.enterText(find.byType(TextField).at(0), 'ana@biblioteca.com');
+  await tester.enterText(find.byType(TextField).at(0), 'ana@eventos.com');
   await tester.enterText(find.byType(TextField).at(1), senha);
   await tester.tap(find.widgetWithText(ElevatedButton, 'Entrar'));
   await tester.pumpAndSettle();
@@ -113,6 +153,15 @@ Future<void> preencherECadastrar(WidgetTester tester, String email, String senha
   await tester.enterText(find.byType(TextField).at(1), email);
   await tester.enterText(find.byType(TextField).at(2), senha);
   await tester.tap(find.widgetWithText(ElevatedButton, 'Cadastrar'));
+  await tester.pumpAndSettle();
+}
+
+// A Ana já entrou (a sessão restaurada, como o main faz) e toca em Ver os eventos.
+Future<void> abrirOsEventos(WidgetTester tester, http.Client eventos) async {
+  final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+  await sessao.restaurar();
+  await tester.pumpWidget(appDeMentira(sessao, eventos: eventos));
+  await tester.tap(find.text('Ver os eventos'));
   await tester.pumpAndSettle();
 }
 
@@ -174,7 +223,7 @@ void main() {
   testWidgets('cadastrar pela tela cria a conta e abre a tela inicial', (tester) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
-    await preencherECadastrar(tester, 'bia@biblioteca.com', 'segredo456');
+    await preencherECadastrar(tester, 'bia@eventos.com', 'segredo456');
 
     expect(find.byType(InicioScreen), findsOneWidget);
     expect(find.text('Olá, Bia!'), findsOneWidget);
@@ -184,7 +233,7 @@ void main() {
   testWidgets('e-mail repetido: a tela mostra o erro e fica no cadastro', (tester) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
-    await preencherECadastrar(tester, 'ana@biblioteca.com', 'segredo456');
+    await preencherECadastrar(tester, 'ana@eventos.com', 'segredo456');
 
     expect(find.text('Já existe uma conta com este e-mail'), findsOneWidget);
     expect(find.byType(CadastroScreen), findsOneWidget);
@@ -220,7 +269,7 @@ void main() {
     await abrirOMenu(tester);
     final menu = find.byType(Drawer);
     expect(find.descendant(of: menu, matching: find.text('Ana')), findsOneWidget);
-    expect(find.descendant(of: menu, matching: find.text('ana@biblioteca.com')), findsOneWidget);
+    expect(find.descendant(of: menu, matching: find.text('ana@eventos.com')), findsOneWidget);
 
     await tester.tap(find.descendant(of: menu, matching: find.text('Perfil')));
     await tester.pumpAndSettle();
@@ -234,10 +283,10 @@ void main() {
     final sessao = sessaoDeMentira();
     await tester.pumpWidget(appDeMentira(sessao));
     await preencherEEntrar(tester, 'segredo123');
-    await tester.tap(find.text('Ver os livros'));
+    await tester.tap(find.text('Ver os eventos'));
     await tester.pumpAndSettle();
     expect(find.byType(EventosScreen), findsOneWidget);
-    expect(await tokenGuardado(), 'token-de-ana@biblioteca.com');
+    expect(await tokenGuardado(), 'token-de-ana@eventos.com');
 
     await abrirOMenu(tester);
     await tester.tap(find.text('Sair'));
@@ -251,7 +300,7 @@ void main() {
   });
 
   testWidgets('com a sessão restaurada, o app abre direto na tela inicial', (tester) async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@biblioteca.com'});
+    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
     await sessao.restaurar();
 
     await tester.pumpWidget(appDeMentira(sessao));
@@ -278,10 +327,105 @@ void main() {
     );
     expect(find.text('ninguém'), findsOneWidget);
 
-    await sessao.entrar('ana@biblioteca.com', 'segredo123');
+    await sessao.entrar('ana@eventos.com', 'segredo123');
     await tester.pump();
 
     expect(find.text('Ana'), findsOneWidget);
+  });
+
+  // Os quatro estados da tela de eventos: lista, vazia, erro e carregando.
+  testWidgets('a tela de eventos mostra os dados de dois eventos', (tester) async {
+    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+
+    expect(find.text('Feira de Tecnologia'), findsOneWidget);
+    expect(find.text('Mostra Cultural'), findsOneWidget);
+    expect(find.textContaining('Centro de Eventos'), findsOneWidget);
+    expect(find.textContaining('2026-10-20'), findsWidgets);
+    expect(find.textContaining('2026-10-22'), findsWidgets);
+    expect(find.text('Feira de Tecnologia'), findsOneWidget);
+    expect(find.textContaining('2026-11-05'), findsWidgets);
+  });
+
+  testWidgets('sem evento nenhum, a tela diz que a lista está vazia', (tester) async {
+    await abrirOsEventos(tester, apiDeEventos(200, []));
+
+    expect(find.text('Nenhum evento encontrado.'), findsOneWidget);
+    expect(find.text('Feira de Tecnologia'), findsNothing);
+  });
+
+  testWidgets('com a API parada, o erro; o Tentar de novo pede outra vez', (tester) async {
+    var noAr = false;
+    final eventos = MockClient((pedido) async {
+      if (!noAr) {
+        throw http.ClientException('Failed to fetch');
+      }
+      return http.Response(jsonEncode(doisEventos), 200);
+    });
+    await abrirOsEventos(tester, eventos);
+    expect(find.text('Não foi possível carregar os eventos'), findsOneWidget);
+    expect(find.text('Não consegui falar com a API. O uvicorn está rodando?'), findsOneWidget);
+
+    noAr = true;
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Tentar de novo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Feira de Tecnologia'), findsOneWidget);
+    expect(find.text('Tentar de novo'), findsNothing);
+  });
+
+  testWidgets('enquanto a resposta não chega, a tela mostra o carregando', (tester) async {
+    final resposta = Completer<http.Response>();
+    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+    await sessao.restaurar();
+    await tester.pumpWidget(
+      appDeMentira(sessao, eventos: MockClient((pedido) => resposta.future)),
+    );
+    await tester.tap(find.text('Ver os eventos'));
+    // Sem pumpAndSettle: o círculo gira para sempre, e ele esperaria em vão.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    resposta.complete(http.Response(jsonEncode(doisEventos), 200));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Feira de Tecnologia'), findsOneWidget);
+  });
+
+  testWidgets('tocar num evento abre o detalhe, que busca o evento na API pelo id', (tester) async {
+    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+    pedidos = 0;
+
+    await tester.tap(find.text('Mostra Cultural'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EventoScreen), findsOneWidget);
+    expect(find.textContaining('2026-11-05'), findsWidgets);
+    expect(find.textContaining('Auditório Municipal'), findsOneWidget);
+    expect(pedidos, 1);
+  });
+
+  testWidgets('o detalhe de um evento que não existe mais mostra o erro da API', (tester) async {
+    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+
+    Navigator.of(tester.element(find.byType(EventosScreen))).pushNamed(AppRoutes.evento, arguments: 99);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Não consegui carregar o evento'), findsOneWidget);
+    expect(find.text('Evento 99 nao foi encontrado'), findsOneWidget);
+    expect(find.text('Tentar de novo'), findsOneWidget);
+  });
+
+  testWidgets('sem o evento na rota (o F5 no detalhe), a tela mostra a lista', (tester) async {
+    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+
+    Navigator.of(tester.element(find.byType(EventosScreen))).pushNamed(AppRoutes.evento);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EventoScreen), findsOneWidget);
+    expect(find.text('Feira de Tecnologia'), findsOneWidget);
   });
 
   // O service testado sozinho, sem tela nenhuma: é o que as camadas compram.
@@ -300,8 +444,8 @@ void main() {
     var avisos = 0;
     sessao.addListener(() => avisos++);
 
-    await sessao.entrar('ana@biblioteca.com', 'segredo123');
-    expect(sessao.token, 'token-de-ana@biblioteca.com');
+    await sessao.entrar('ana@eventos.com', 'segredo123');
+    expect(sessao.token, 'token-de-ana@eventos.com');
     expect(sessao.usuario?.nome, 'Ana');
     expect(avisos, 1);
 
@@ -314,22 +458,22 @@ void main() {
   test('cadastrar cria a conta e já entra com ela, pelo mesmo caminho do login', () async {
     final sessao = sessaoDeMentira();
 
-    await sessao.cadastrar('Bia', 'bia@biblioteca.com', 'segredo456');
+    await sessao.cadastrar('Bia', 'bia@eventos.com', 'segredo456');
 
     expect(sessao.logado, isTrue);
     expect(sessao.usuario?.nome, 'Bia');
-    expect(sessao.token, 'token-de-bia@biblioteca.com');
+    expect(sessao.token, 'token-de-bia@eventos.com');
   });
 
   test('o service traduz a recusa da API: e-mail repetido (409) e campo inválido (422)', () async {
     final sessao = sessaoDeMentira();
 
     await expectLater(
-      sessao.cadastrar('Ana', 'ana@biblioteca.com', 'segredo123'),
+      sessao.cadastrar('Ana', 'ana@eventos.com', 'segredo123'),
       recusadoCom('Já existe uma conta com este e-mail'),
     );
     await expectLater(
-      sessao.cadastrar('Bia', 'bia@biblioteca.com', '123'),
+      sessao.cadastrar('Bia', 'bia@eventos.com', '123'),
       recusadoCom('senha: String should have at least 6 characters'),
     );
     expect(sessao.logado, isFalse);
@@ -339,13 +483,13 @@ void main() {
   test('entrar guarda o token no aparelho', () async {
     final sessao = sessaoDeMentira();
 
-    await sessao.entrar('ana@biblioteca.com', 'segredo123');
+    await sessao.entrar('ana@eventos.com', 'segredo123');
 
-    expect(await tokenGuardado(), 'token-de-ana@biblioteca.com');
+    expect(await tokenGuardado(), 'token-de-ana@eventos.com');
   });
 
   test('restaurar devolve a sessão a quem tem um token guardado', () async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@biblioteca.com'});
+    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
     pedidos = 0;
 
     await sessao.restaurar();
@@ -375,12 +519,59 @@ void main() {
   });
 
   test('sair apaga o token guardado no aparelho', () async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@biblioteca.com'});
+    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
     await sessao.restaurar();
     expect(sessao.logado, isTrue);
 
     await sessao.sair();
 
     expect(await tokenGuardado(), isNull);
+  });
+
+  test('o repositório manda o token no cabeçalho e devolve objetos Evento', () async {
+    String? cabecalho;
+    final cliente = MockClient((pedido) async {
+      cabecalho = pedido.headers['Authorization'];
+      return http.Response(jsonEncode(doisEventos), 200);
+    });
+
+    final eventos = await EventoRepository(cliente: cliente).listar('tk-123');
+
+    expect(cabecalho, 'Bearer tk-123');
+    expect(eventos, hasLength(2));
+    expect(eventos.first, isA<Evento>());
+    expect(eventos.first.nome, 'Feira de Tecnologia');
+    expect(eventos.last.local, 'Auditório Municipal');
+    expect(eventos.first.data_inicio.toString(), contains('2026-10-20'));
+    expect(eventos.first.data_fim.toString(), contains('2026-10-22'));
+  });
+
+  test('o repositório busca um evento só pelo id, com o token: GET /eventos/2', () async {
+    String? caminho;
+    String? cabecalho;
+    final cliente = MockClient((pedido) async {
+      caminho = pedido.url.path;
+      cabecalho = pedido.headers['Authorization'];
+      return http.Response(jsonEncode(doisEventos.last), 200);
+    });
+
+    final evento = await EventoRepository(cliente: cliente).buscar('tk-123', 2);
+
+    expect(caminho, '/eventos/2');
+    expect(cabecalho, 'Bearer tk-123');
+    expect(evento.nome, 'Mostra Cultural');
+    expect(evento.local, 'Auditório Municipal');
+  });
+
+  test('o service dos eventos traduz a recusa: a frase da API vai para a tela', () async {
+    final sessao = sessaoDeMentira();
+    await sessao.entrar('ana@eventos.com', 'segredo123');
+    final recusa = apiDeEventos(401, {'detail': 'Token invalido ou vencido'});
+    final servico = EventoService(EventoRepository(cliente: recusa), sessao);
+
+    await expectLater(
+      servico.listar(),
+      throwsA(isA<ErroDeEventos>().having((e) => '$e', 'texto', 'Token invalido ou vencido')),
+    );
   });
 }
