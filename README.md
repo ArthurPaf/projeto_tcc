@@ -83,3 +83,7 @@ O token fica no aparelho (`shared_preferences`, que no navegador é o `localStor
 
 A tela de eventos chama GET /eventos/ pelas camadas do aplicativo (tela, EventoService, EventoRepository), com o token no cabeçalho, e mostra apenas os eventos de quem está logado, exibindo nome, local, data de início e data de fim. Ela possui quatro estados: carregando, erro (com botão Tentar de novo), lista vazia e listagem dos eventos.
 Ao tocar em um evento, o aplicativo abre a tela de detalhes pela rota /evento, passando o ID nos arguments. A tela consulta a API (GET /eventos/{id}) para buscar e apresentar os dados atualizados do evento.
+
+O app cria, edita e exclui eventos pelas camadas (tela, `EventoService`, `EventoRepository`), com o token no cabeçalho: `POST /eventos/`, `PATCH /eventos/{id}` e `DELETE /eventos/{id}`. Um formulário só (`FormularioScreen`) serve para criar e para editar, com os campos `nome`, `local`, `data_inicio` e `data_fim`.
+
+A validação acontece nas duas pontas: o `validator` de cada campo antes de enviar, e a API, que recusa com 422 ou 409; a frase da API aparece na tela. Excluir pede confirmação num diálogo. Depois de cada operação, a tela fecha com `true`, e a lista pede os eventos de novo.
