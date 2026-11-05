@@ -1,8 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/evento.dart';
 import '../services/evento_service.dart';
+import '../widgets/aviso.dart';
 import 'eventos_screen.dart';
 
 // Uma tela só para criar e para editar: sem evento, cria; com o evento, edita.
@@ -23,9 +25,10 @@ class _FormularioScreenState extends State<FormularioScreen> {
   // todos os campos de uma vez.
   final chave = GlobalKey<FormState>();
   final nome = TextEditingController();
+  final local = TextEditingController();
   final dataInicio = TextEditingController();
   final dataFim = TextEditingController();
-  final local = TextEditingController();
+
   bool salvando = false;
   String? erro;
 
@@ -35,9 +38,9 @@ class _FormularioScreenState extends State<FormularioScreen> {
     // Editando: os campos já começam com o que o evento tem.
     if (widget.evento != null) {
       nome.text = widget.evento!.nome;
-      dataInicio.text = widget.evento!.data_inicio;
-      dataFim.text = widget.evento!.data_fim;
       local.text = widget.evento!.local;
+      dataInicio.text = widget.evento!.dataInicio;
+      dataFim.text = widget.evento!.dataFim;
     }
   }
 
@@ -47,16 +50,24 @@ class _FormularioScreenState extends State<FormularioScreen> {
     if (!chave.currentState!.validate()) {
       return;
     }
+
     setState(() {
       salvando = true;
       erro = null;
     });
+
     // A ponta da API: ela confere tudo de novo, e pode recusar (422, 409).
-    // O servico é o EventoService, pego uma vez para as duas chamadas abaixo.
+    // O serviço é o EventoService, pego uma vez para as duas chamadas abaixo.
     final servico = context.read<EventoService>();
+
     try {
       if (widget.evento == null) {
-        await servico.criar(nome.text, local.text, dataInicio.text, dataFim.text);
+        await servico.criar(
+          nome.text,
+          local.text,
+          dataInicio.text,
+          dataFim.text,
+        );
       } else {
         await servico.atualizar(
           widget.evento!.id,
@@ -67,23 +78,32 @@ class _FormularioScreenState extends State<FormularioScreen> {
         );
       }
     } on ErroDeEventos catch (e) {
+      if (!mounted) return;
+
       setState(() {
         salvando = false;
         erro = '$e';
       });
+
+      // A frase da API fica no formulário; o aviso diz que não deu.
+      avisar(context, 'Não deu para salvar', erro: true);
       return;
     }
+
     if (!mounted) return;
-    // Deu certo: o formulário fecha com true, e quem o abriu pede de novo.
+
+    // Deu certo: o aviso verde, e o formulário fecha com true; quem o abriu
+    // pede de novo. O aviso continua na tela da lista.
+    avisar(context, 'Evento salvo');
     Navigator.pop(context, true);
   }
 
   @override
   void dispose() {
     nome.dispose();
+    local.dispose();
     dataInicio.dispose();
     dataFim.dispose();
-    local.dispose();
     super.dispose();
   }
 
@@ -94,7 +114,9 @@ class _FormularioScreenState extends State<FormularioScreen> {
     if (ModalRoute.of(context)!.isFirst) {
       return const EventosScreen();
     }
+
     final editando = widget.evento != null;
+
     return Scaffold(
       appBar: AppBar(title: Text(editando ? 'Editar evento' : 'Novo evento')),
       body: Center(

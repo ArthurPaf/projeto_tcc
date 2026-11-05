@@ -1,9 +1,11 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/evento.dart';
 import '../routes.dart';
 import '../services/evento_service.dart';
+import '../widgets/aviso.dart';
 import 'eventos_screen.dart';
 
 // O detalhe de um evento. Chega só o id, e a tela pede o evento à API: o dado é
@@ -23,7 +25,8 @@ class EventoScreen extends StatefulWidget {
 class _EventoScreenState extends State<EventoScreen> {
   // O pedido do evento: como o da lista, nasce uma vez, no initState.
   late Future<Evento> pedido;
-  // A recusa da exclusão (o evento emprestado, por exemplo), para a tela mostrar.
+
+  // A recusa da exclusão, para a tela mostrar.
   String? erro;
 
   @override
@@ -43,7 +46,12 @@ class _EventoScreenState extends State<EventoScreen> {
   // Abre o formulário com o evento, para editar. Se ele voltar com true (salvou),
   // esta tela também fecha com true: passa a notícia para a lista.
   Future<void> editar(Evento evento) async {
-    final salvou = await Navigator.pushNamed(context, AppRoutes.formulario, arguments: evento);
+    final salvou = await Navigator.pushNamed(
+      context,
+      AppRoutes.formulario,
+      arguments: evento,
+    );
+
     if (salvou == true && mounted) {
       Navigator.pop(context, true);
     }
@@ -56,7 +64,9 @@ class _EventoScreenState extends State<EventoScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Excluir ${evento.nome}?'),
-        content: const Text('Tem certeza? O evento sai do seu acervo, e não dá para desfazer.'),
+        content: const Text(
+          'Tem certeza? O evento será excluído e não será possível desfazer.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -69,18 +79,27 @@ class _EventoScreenState extends State<EventoScreen> {
         ],
       ),
     );
+
     if (certeza != true || !mounted) {
       return;
     }
+
     try {
       await context.read<EventoService>().excluir(evento.id);
     } on ErroDeEventos catch (e) {
+      if (!mounted) return;
+
       setState(() {
         erro = '$e';
       });
+
+      avisar(context, 'Não deu para excluir', erro: true);
       return;
     }
+
     if (!mounted) return;
+
+    avisar(context, 'Evento excluído');
     Navigator.pop(context, true);
   }
 
@@ -89,6 +108,7 @@ class _EventoScreenState extends State<EventoScreen> {
     if (widget.id == null) {
       return const EventosScreen();
     }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Evento')),
       body: FutureBuilder<Evento>(
@@ -99,6 +119,7 @@ class _EventoScreenState extends State<EventoScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -121,20 +142,34 @@ class _EventoScreenState extends State<EventoScreen> {
               ),
             );
           }
+
           final evento = snapshot.data!;
+
           return ListView(
             children: [
               ListTile(
-                leading: const Icon(Icons.menu_book),
-                title: const Text('Título'),
+                leading: const Icon(Icons.event),
+                title: const Text('Nome'),
                 subtitle: Text(evento.nome),
               ),
               ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title: const Text('Ano'),
+                leading: const Icon(Icons.location_on),
+                title: const Text('Local'),
                 subtitle: Text(evento.local),
               ),
+              ListTile(
+                leading: const Icon(Icons.calendar_today),
+                title: const Text('Data de início'),
+                subtitle: Text(evento.dataInicio),
+              ),
+              ListTile(
+                leading: const Icon(Icons.event_available),
+                title: const Text('Data de fim'),
+                subtitle: Text(evento.dataFim),
+              ),
+
               const SizedBox(height: 16),
+
               // Editar e Excluir: o evento já está na mão, e é o de agora.
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -152,6 +187,7 @@ class _EventoScreenState extends State<EventoScreen> {
                   ),
                 ],
               ),
+
               if (erro != null) ...[
                 const SizedBox(height: 16),
                 Text(
