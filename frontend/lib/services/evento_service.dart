@@ -1,3 +1,4 @@
+
 import '../models/evento.dart';
 import '../repositories/evento_repository.dart';
 import '../repositories/usuario_repository.dart';
@@ -23,10 +24,11 @@ class EventoService {
   final EventoRepository repositorio;
   final SessaoService sessao;
 
-  Future<List<Evento>> listar() async {
+  // A lista inteira, ou só os eventos com a busca no nome ('' = todos).
+  Future<List<Evento>> listar({String busca = ''}) async {
     try {
-      // O guarda só abre a tela de livros com sessão: o token nunca é null aqui.
-      return await repositorio.listar(sessao.token!);
+      // O guarda só abre a tela de eventos com sessão: o token nunca é null aqui.
+      return await repositorio.listar(sessao.token!, busca: busca);
     } on RecusaDaApi catch (e) {
       throw ErroDeEventos(e.mensagem);
     } on Exception {
@@ -50,49 +52,49 @@ class EventoService {
 
   // Criar, editar e excluir: o mesmo molde do listar. O token vem da sessão,
   // e a recusa da API (422, 409, 404) vira a frase que a tela mostra.
-Future<Evento> criar(
-  String nome,
-  String local,
-  String data_inicio,
-  String data_fim,
-) async {
-  try {
-    return await repositorio.criar(
-      sessao.token!,
-      nome,
-      local,
-      data_inicio,
-      data_fim,
-    );
-  } on RecusaDaApi catch (e) {
-    throw ErroDeEventos(e.mensagem);
-  } on Exception {
-    throw ErroDeEventos('Não consegui falar com a API. O uvicorn está rodando?');
+  Future<Evento> criar(
+    String nome,
+    String local,
+    String dataInicio,
+    String dataFim,
+  ) async {
+    try {
+      return await repositorio.criar(
+        sessao.token!,
+        nome,
+        local,
+        dataInicio,
+        dataFim,
+      );
+    } on RecusaDaApi catch (e) {
+      throw ErroDeEventos(e.mensagem);
+    } on Exception {
+      throw ErroDeEventos('Não consegui falar com a API. O uvicorn está rodando?');
+    }
   }
-}
 
-Future<Evento> atualizar(
-  int id,
-  String nome,
-  String local,
-  String data_inicio,
-  String data_fim,
-) async {
-  try {
-    return await repositorio.atualizar(
-      sessao.token!,
-      id,
-      nome,
-      local,
-      data_inicio,
-      data_fim,
-    );
-  } on RecusaDaApi catch (e) {
-    throw ErroDeEventos(e.mensagem);
-  } on Exception {
-    throw ErroDeEventos('Não consegui falar com a API. O uvicorn está rodando?');
+  Future<Evento> atualizar(
+    int id,
+    String nome,
+    String local,
+    String dataInicio,
+    String dataFim,
+  ) async {
+    try {
+      return await repositorio.atualizar(
+        sessao.token!,
+        id,
+        nome,
+        local,
+        dataInicio,
+        dataFim,
+      );
+    } on RecusaDaApi catch (e) {
+      throw ErroDeEventos(e.mensagem);
+    } on Exception {
+      throw ErroDeEventos('Não consegui falar com a API. O uvicorn está rodando?');
+    }
   }
-}
 
   Future<void> excluir(int id) async {
     try {

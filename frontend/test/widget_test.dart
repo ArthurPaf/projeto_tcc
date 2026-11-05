@@ -94,8 +94,8 @@ SessaoService sessaoDeMentira({Map<String, Object> guardado = const {}}) {
 
 // Dois eventos da Ana, na forma do EventoPublico que a API devolve.
 const doisEventos = [
-  {'id': 1, 'nome': 'Festival de Música', 'descricao': 'Festival com apresentações musicais', 'data': '2026-11-10', 'disponivel': true, 'dono_id': 1},
-  {'id': 2, 'nome': 'Feira de Tecnologia', 'descricao': 'Feira com novidades em tecnologia', 'data': '2026-11-20', 'disponivel': false, 'dono_id': 1},
+  {'id': 1, 'nome': 'Festival de Música', 'local': 'Praça Central', 'data_inicio': '2026-11-10', 'data_fim': '2026-11-11', 'disponivel': true, 'dono_id': 1},
+  {'id': 2, 'nome': 'Feira de Tecnologia', 'local': 'Centro de Convenções', 'data_inicio': '2026-11-20', 'data_fim': '2026-11-21', 'disponivel': false, 'dono_id': 1},
 ];
 
 // A API de eventos de mentira: o GET /eventos/ responde com este status e este
@@ -123,13 +123,17 @@ http.Client apiDeEventos(int status, Object corpo) {
 // A agenda de mentira, para criar, editar e excluir: ela guarda o que recebe,
 // e responde como a API de verdade, com as recusas dela (o nome repetido e
 // o evento encerrado, 409). Começa com os dois eventos da Ana.
+// O GET /eventos/?nome=... filtra os eventos pelo nome.
+Uri? ultimoEndereco;
+
 http.Client agendaDeMentira() {
   final List<Map<String, dynamic>> agenda = [
-    {'id': 1, 'nome': 'Festival de Música', 'descricao': 'Festival com apresentações musicais', 'data': '2026-11-10', 'disponivel': true, 'dono_id': 1},
-    {'id': 2, 'nome': 'Feira de Tecnologia', 'descricao': 'Feira com novidades em tecnologia', 'data': '2026-11-20', 'disponivel': false, 'dono_id': 1},
+    {'id': 1, 'nome': 'Festival de Música', 'local': 'Praça Central', 'data_inicio': '2026-11-10', 'data_fim': '2026-11-11', 'disponivel': true, 'dono_id': 1},
+    {'id': 2, 'nome': 'Feira de Tecnologia', 'local': 'Centro de Convenções', 'data_inicio': '2026-11-20', 'data_fim': '2026-11-21', 'disponivel': false, 'dono_id': 1},
   ];
   return MockClient((pedido) async {
     pedidos++;
+    ultimoEndereco = pedido.url;
     final id = int.tryParse(pedido.url.pathSegments.last); // null em /eventos/
     if (pedido.method == 'POST' || pedido.method == 'PATCH') {
       final dados = jsonDecode(pedido.body);
@@ -139,13 +143,18 @@ http.Client agendaDeMentira() {
         }
       }
       if (pedido.method == 'POST') {
-        final novo = {'id': 3, 'nome': dados['nome'], 'descricao': dados['descricao'], 'data': dados['data'], 'disponivel': true, 'dono_id': 1};
+        final novo = {'id': 3, 'nome': dados['nome'], 'local': dados['local'], 'data_inicio': dados['data_inicio'], 'data_fim': dados['data_fim'], 'disponivel': true, 'dono_id': 1};
         agenda.add(novo);
         return http.Response(jsonEncode(novo), 201);
       }
     }
     if (id == null) {
-      return http.Response(jsonEncode(agenda), 200);
+      final busca = (pedido.url.queryParameters['nome'] ?? '').toLowerCase();
+      final achados = [
+        for (final evento in agenda)
+          if ('${evento['nome']}'.toLowerCase().contains(busca)) evento,
+      ];
+      return http.Response(jsonEncode(achados), 200);
     }
     for (final evento in agenda) {
       if (evento['id'] == id) {
@@ -203,13 +212,27 @@ Future<void> preencherECadastrar(WidgetTester tester, String email, String senha
   await tester.pumpAndSettle();
 }
 
-// Na lista aberta, toca no + e preenche o formulário com o nome, a descrição e a data.
-Future<void> preencherOFormulario(WidgetTester tester, String nome, String descricao, String data) async {
+// Na lista aberta, toca no + e preenche os quatro campos do evento.
+Future<void> preencherOFormulario(
+  WidgetTester tester,
+  String nome,
+  String local,
+  String dataInicio,
+  String dataFim,
+) async {
   await tester.tap(find.byTooltip('Novo evento'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextFormField).at(0), nome);
-  await tester.enterText(find.byType(TextFormField).at(1), descricao);
-  await tester.enterText(find.byType(TextFormField).at(2), data);
+  await tester.enterText(find.byType(TextFormField).at(1), local);
+  await tester.enterText(find.byType(TextFormField).at(2), dataInicio);
+  await tester.enterText(find.byType(TextFormField).at(3), dataFim);
+}
+
+// Na lista aberta, digita no campo de busca e aperta Enter.
+Future<void> buscar(WidgetTester tester, String texto) async {
+  await tester.enterText(find.byType(TextField).first, texto);
+  await tester.testTextInput.receiveAction(TextInputAction.search);
+  await tester.pumpAndSettle();
 }
 
 // No detalhe aberto, toca em Excluir e responde ao diálogo com este botão.
@@ -403,7 +426,7 @@ void main() {
 
     expect(find.byType(ListTile), findsNWidgets(2));
     expect(find.text('Festival de Música'), findsOneWidget);
-    expect(find.text('2026-11-20'), findsOneWidget);
+    expect(find.text('Centro de Convenções'), findsOneWidget);
   });
 
   testWidgets('sem evento nenhum, a tela diz que a lista está vazia', (tester) async {
@@ -463,7 +486,7 @@ void main() {
 
     expect(find.byType(EventoScreen), findsOneWidget);
     expect(find.text('2026-11-20'), findsOneWidget);
-    expect(find.text('Encerrado'), findsOneWidget);
+    expect(find.text('Centro de Convenções'), findsOneWidget);
     expect(pedidos, 1);
   });
 
@@ -492,7 +515,7 @@ void main() {
   testWidgets('o + abre o formulário vazio, e salvar põe o evento novo na lista', (tester) async {
     await abrirOsEventos(tester, agendaDeMentira());
 
-    await preencherOFormulario(tester, 'Encontro Cultural', 'Um evento interessante', '2026-12-10');
+    await preencherOFormulario(tester, 'Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11');
     expect(find.text('Novo evento'), findsOneWidget);
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
@@ -504,21 +527,22 @@ void main() {
 
   testWidgets('o validator segura o formulário: com campo errado, nada vai para a API', (tester) async {
     await abrirOsEventos(tester, agendaDeMentira());
-    await preencherOFormulario(tester, '', '', '');
+    await preencherOFormulario(tester, '', '', '', '');
     pedidos = 0;
 
     await tester.tap(find.text('Salvar'));
     await tester.pump();
     expect(find.text('Informe o nome'), findsOneWidget);
-    expect(find.text('Informe uma data válida'), findsOneWidget);
+    expect(find.text('Informe a data de início'), findsOneWidget);
+    expect(find.text('Informe a data de fim'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Encontro Cultural');
-    await tester.enterText(find.byType(TextFormField).at(1), 'Um evento interessante');
-    await tester.enterText(find.byType(TextFormField).at(2), 'data inválida');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Centro Cultural');
+    await tester.enterText(find.byType(TextFormField).at(2), '');
     await tester.tap(find.text('Salvar'));
     await tester.pump();
     expect(find.text('Informe o nome'), findsNothing);
-    expect(find.text('Informe uma data válida'), findsOneWidget);
+    expect(find.text('Informe a data de início'), findsOneWidget);
     expect(pedidos, 0);
     expect(find.byType(FormularioScreen), findsOneWidget);
   });
@@ -526,7 +550,7 @@ void main() {
   testWidgets('nome repetido: a API recusa (409), e o formulário mostra a frase e fica aberto', (tester) async {
     await abrirOsEventos(tester, agendaDeMentira());
 
-    await preencherOFormulario(tester, 'Festival de Música', 'Festival com apresentações musicais', '2026-11-10');
+    await preencherOFormulario(tester, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11');
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
 
@@ -545,14 +569,14 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Festival de Música'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '2026-11-10'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField).at(2), '2026-11-11');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Teatro Municipal');
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
 
     expect(find.byType(FormularioScreen), findsNothing);
     expect(find.byType(EventoScreen), findsNothing);
-    expect(find.text('2026-11-11'), findsOneWidget);
-    expect(find.text('2026-11-10'), findsNothing);
+    expect(find.text('Teatro Municipal'), findsOneWidget);
+    expect(find.text('Praça Central'), findsNothing);
   });
 
   testWidgets('excluir pergunta antes: Cancelar deixa o evento; Excluir o tira da lista', (tester) async {
@@ -584,6 +608,74 @@ void main() {
 
     expect(find.text('Evento 2 esta encerrado'), findsOneWidget);
     expect(find.byType(EventoScreen), findsOneWidget);
+  });
+
+  // A busca e os avisos, preservados do projeto da biblioteca.
+  testWidgets('a busca pede à API só os eventos com o texto no nome', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await buscar(tester, 'festival');
+    expect(ultimoEndereco!.queryParameters['nome'], 'festival');
+    expect(find.text('Festival de Música'), findsOneWidget);
+    expect(find.text('Feira de Tecnologia'), findsNothing);
+    expect(find.byType(ListTile), findsOneWidget);
+  });
+
+  testWidgets('a busca sem resultado diz o que foi procurado', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await buscar(tester, 'xyz');
+    expect(find.text('Nenhum evento com "xyz" no nome.'), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
+  });
+
+  testWidgets('a busca vazia volta à lista inteira, sem parâmetro', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await buscar(tester, 'festival');
+    await buscar(tester, '');
+    expect(ultimoEndereco!.hasQuery, isFalse);
+    expect(find.byType(ListTile), findsNWidgets(2));
+  });
+
+  testWidgets('depois de salvar, a lista pede de novo com a mesma busca', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await buscar(tester, 'festival');
+    await preencherOFormulario(tester, 'Festival Gastronômico', 'Parque', '2026-12-10', '2026-12-11');
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ListTile), findsNWidgets(2));
+    expect(find.text('Feira de Tecnologia'), findsNothing);
+  });
+
+  testWidgets('salvar mostra o aviso: Evento salvo', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await preencherOFormulario(tester, 'Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11');
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FormularioScreen), findsNothing);
+    expect(find.widgetWithText(SnackBar, 'Evento salvo'), findsOneWidget);
+  });
+
+  testWidgets('recusa da API mostra aviso e mantém a frase no formulário', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await preencherOFormulario(tester, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11');
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(SnackBar, 'Não deu para salvar'), findsOneWidget);
+    expect(find.text('Ja existe um evento chamado Festival de Música'), findsOneWidget);
+    expect(find.byType(FormularioScreen), findsOneWidget);
+  });
+
+  testWidgets('excluir mostra aviso de sucesso ou falha', (tester) async {
+    await abrirOsEventos(tester, agendaDeMentira());
+    await tester.tap(find.text('Festival de Música'));
+    await tester.pumpAndSettle();
+    await excluirRespondendo(tester, 'Excluir');
+    expect(find.widgetWithText(SnackBar, 'Evento excluído'), findsOneWidget);
+
+    await tester.tap(find.text('Feira de Tecnologia'));
+    await tester.pumpAndSettle();
+    await excluirRespondendo(tester, 'Excluir');
+    expect(find.widgetWithText(SnackBar, 'Não deu para excluir'), findsOneWidget);
+    expect(find.text('Evento 2 esta encerrado'), findsOneWidget);
   });
 
   testWidgets('depois de um F5 no formulário (a primeira tela da pilha), ele mostra a lista', (tester) async {
@@ -736,7 +828,7 @@ void main() {
     final cliente = MockClient((pedido) async {
       enviado = pedido;
       return http.Response(
-        jsonEncode({'id': 3, 'nome': 'Encontro Cultural', 'descricao': 'Um evento interessante', 'data': '2026-12-10'}),
+        jsonEncode({'id': 3, 'nome': 'Encontro Cultural', 'local': 'Centro Cultural', 'data_inicio': '2026-12-10', 'data_fim': '2026-12-11'}),
 
         201,
       );
@@ -748,7 +840,7 @@ void main() {
     expect(enviado.url.path, '/eventos/');
     expect(enviado.headers['Authorization'], 'Bearer tk-123');
     expect(enviado.headers['Content-Type'], startsWith('application/json'));
-    expect(jsonDecode(enviado.body), {'nome': 'Encontro Cultural', 'descricao': 'Um evento interessante', 'data': '2026-12-10'});
+    expect(jsonDecode(enviado.body), {'nome': 'Encontro Cultural', 'local': 'Centro Cultural', 'data_inicio': '2026-12-10', 'data_fim': '2026-12-11'});
     expect(evento.id, 3);
   });
 
@@ -763,7 +855,7 @@ void main() {
     });
     final repositorio = EventoRepository(cliente: cliente);
 
-    await repositorio.atualizar('tk-123', 1, 'Festival de Música', 'Festival com apresentações musicais', '2026-11-10', '2026-11-11',);
+    await repositorio.atualizar('tk-123', 1, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11',);
     await repositorio.excluir('tk-123', 1);
 
     expect(feitos, ['PATCH /eventos/1', 'DELETE /eventos/1']);
@@ -778,7 +870,7 @@ void main() {
           'detail': [
             {
               'type': 'value_error',
-              'loc': ['body', 'data'],
+              'loc': ['body', 'data_inicio'],
               'msg': 'Value error, a data precisa ser válida',
             },
           ],
@@ -789,8 +881,8 @@ void main() {
     final servico = EventoService(EventoRepository(cliente: recusa), sessao);
 
     await expectLater(
-      servico.criar('Encontro Cultural', 'Um evento interessante', '2026-12-10', '2026-12-11',),
-      throwsA(isA<ErroDeEventos>().having((e) => '$e', 'texto', 'data: a data precisa ser válida')),
+      servico.criar('Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11',),
+      throwsA(isA<ErroDeEventos>().having((e) => '$e', 'texto', 'data_inicio: a data precisa ser válida')),
     );
   });
 
