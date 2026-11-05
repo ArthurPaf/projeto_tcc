@@ -123,8 +123,7 @@ http.Client apiDeEventos(int status, Object corpo) {
 // A agenda de mentira, para criar, editar e excluir: ela guarda o que recebe,
 // e responde como a API de verdade, com as recusas dela (o nome repetido e
 // o evento encerrado, 409). Começa com os dois eventos da Ana.
-// O GET /eventos/?nome=... filtra pelo nome, e o ?disponivel=true
-// devolve somente os eventos disponíveis. Os filtros também podem ser combinados.
+// O GET /eventos/?nome=... filtra os eventos pelo nome.
 Uri? ultimoEndereco;
 
 http.Client agendaDeMentira() {
@@ -151,12 +150,9 @@ http.Client agendaDeMentira() {
     }
     if (id == null) {
       final busca = (pedido.url.queryParameters['nome'] ?? '').toLowerCase();
-      final soDisponiveis = pedido.url.queryParameters['disponivel'] == 'true';
       final achados = [
         for (final evento in agenda)
-          if ('${evento['nome']}'.toLowerCase().contains(busca) &&
-              (!soDisponiveis || evento['disponivel'] == true))
-            evento,
+          if ('${evento['nome']}'.toLowerCase().contains(busca)) evento,
       ];
       return http.Response(jsonEncode(achados), 200);
     }
@@ -647,58 +643,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ListTile), findsNWidgets(2));
     expect(find.text('Feira de Tecnologia'), findsNothing);
-  });
-
-  // O filtro dos disponíveis e o botão X que limpa a pesquisa.
-  testWidgets('o filtro Só os disponíveis pede à API o ?disponivel=true', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-
-    await tester.tap(find.text('Só os disponíveis'));
-    await tester.pumpAndSettle();
-
-    expect(ultimoEndereco!.queryParameters['disponivel'], 'true');
-    expect(find.text('Festival de Música'), findsOneWidget);
-    expect(find.text('Feira de Tecnologia'), findsNothing);
-    expect(find.byType(ListTile), findsOneWidget);
-  });
-
-  testWidgets('desligar o filtro volta à lista inteira', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await tester.tap(find.text('Só os disponíveis'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Só os disponíveis'));
-    await tester.pumpAndSettle();
-
-    expect(ultimoEndereco!.hasQuery, isFalse);
-    expect(find.byType(ListTile), findsNWidgets(2));
-  });
-
-  testWidgets('a busca e o filtro vão juntos: ?nome=...&disponivel=true', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await buscar(tester, 'feira');
-
-    await tester.tap(find.text('Só os disponíveis'));
-    await tester.pumpAndSettle();
-
-    expect(ultimoEndereco!.queryParameters, {
-      'nome': 'feira',
-      'disponivel': 'true',
-    });
-    expect(find.text('Nenhum evento com "feira" no nome.'), findsOneWidget);
-    expect(find.byType(ListTile), findsNothing);
-  });
-
-  testWidgets('o X apaga a busca e volta à lista inteira', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await buscar(tester, 'festival');
-
-    await tester.tap(find.byTooltip('Limpar a busca'));
-    await tester.pumpAndSettle();
-
-    expect(ultimoEndereco!.hasQuery, isFalse);
-    expect(find.byType(ListTile), findsNWidgets(2));
-    expect(find.text('festival'), findsNothing);
   });
 
   testWidgets('salvar mostra o aviso: Evento salvo', (tester) async {

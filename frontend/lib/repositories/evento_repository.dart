@@ -14,26 +14,15 @@ class EventoRepository {
   final http.Client cliente;
 
   // GET /eventos/, com o token no cabeçalho, como o quemSouEu: a API devolve só
-  // os eventos do dono do token. Cada filtro escolhido vira um parâmetro de
-  // consulta: a busca, o ?nome=; o "só os disponíveis", o ?disponivel=true.
-  // Os dois juntos: ?nome=festival&disponivel=true. A resposta é uma LISTA em
-  // JSON, e cada item vira um Evento.
-  Future<List<Evento>> listar(
-    String token, {
-    String busca = '',
-    bool soDisponiveis = false,
-  }) async {
+  // os eventos do dono do token. Com uma busca, o endereço ganha o ?titulo=, e
+  // a API devolve só os eventos com aquele pedaço no título. A resposta é uma
+  // LISTA em JSON, e cada item vira um Evento.
+  Future<List<Evento>> listar(String token, {String busca = ''}) async {
     var endereco = Uri.parse('$enderecoDaApi/eventos/');
 
-    // O if dentro do mapa: a chave só entra quando o filtro foi escolhido.
-    final filtros = {
-      if (busca.isNotEmpty) 'nome': busca,
-      if (soDisponiveis) 'disponivel': 'true',
-    };
-
-    if (filtros.isNotEmpty) {
-      // O replace monta o ?nome=...&disponivel=... e codifica o espaço e o acento.
-      endereco = endereco.replace(queryParameters: filtros);
+    if (busca.isNotEmpty) {
+      // O replace monta o ?titulo=... e codifica o espaço e o acento.
+      endereco = endereco.replace(queryParameters: {'titulo': busca});
     }
 
     final resposta = await cliente.get(
@@ -95,8 +84,7 @@ class EventoRepository {
   }
 
   // PATCH /eventos/{id}: só o que o formulário edita, o nome, o local
-  // e as datas de início e fim do evento. A situação (disponivel) não vai:
-  // ela não é alterada por esse formulário.
+  // e as datas de início e fim do evento.
   Future<Evento> atualizar(
     String token,
     int id,
