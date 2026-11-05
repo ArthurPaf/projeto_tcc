@@ -29,6 +29,20 @@ class _FormularioScreenState extends State<FormularioScreen> {
   final dataInicio = TextEditingController();
   final dataFim = TextEditingController();
 
+  String formatarDataParaApi(String data) {
+  final partes = data.trim().split('/');
+
+  if (partes.length == 3) {
+    final dia = partes[0].padLeft(2, '0');
+    final mes = partes[1].padLeft(2, '0');
+    final ano = partes[2];
+
+    return '$ano-$mes-$dia';
+  }
+
+  return data.trim();
+}
+
   bool salvando = false;
   String? erro;
 
@@ -44,59 +58,64 @@ class _FormularioScreenState extends State<FormularioScreen> {
     }
   }
 
-  Future<void> salvar() async {
-    // A ponta do app: cada validator confere o seu campo. Se algum devolver
-    // uma frase, ela aparece embaixo do campo, e nada vai para a API.
-    if (!chave.currentState!.validate()) {
-      return;
+  
+Future<void> salvar() async {
+  // A ponta do app: cada validator confere o seu campo. Se algum devolver
+  // uma frase, ela aparece embaixo do campo, e nada vai para a API.
+  if (!chave.currentState!.validate()) {
+    return;
+  }
+
+  setState(() {
+    salvando = true;
+    erro = null;
+  });
+
+  // A ponta da API: ela confere tudo de novo, e pode recusar (422, 409).
+  // O serviço é o EventoService, pego uma vez para as duas chamadas abaixo.
+  final servico = context.read<EventoService>();
+  debugPrint('Data início original: ${dataInicio.text}');
+  debugPrint('Data início enviada: ${formatarDataParaApi(dataInicio.text)}');
+  debugPrint('Data fim enviada: ${formatarDataParaApi(dataFim.text)}');
+
+  try {
+    if (widget.evento == null) {
+      await servico.criar(
+        nome.text,
+        local.text,
+        formatarDataParaApi(dataInicio.text),
+        formatarDataParaApi(dataFim.text),
+      );
+    } else {
+      await servico.atualizar(
+        widget.evento!.id,
+        nome.text,
+        local.text,
+        formatarDataParaApi(dataInicio.text),
+        formatarDataParaApi(dataFim.text),
+      );
     }
-
-    setState(() {
-      salvando = true;
-      erro = null;
-    });
-
-    // A ponta da API: ela confere tudo de novo, e pode recusar (422, 409).
-    // O serviço é o EventoService, pego uma vez para as duas chamadas abaixo.
-    final servico = context.read<EventoService>();
-
-    try {
-      if (widget.evento == null) {
-        await servico.criar(
-          nome.text,
-          local.text,
-          dataInicio.text,
-          dataFim.text,
-        );
-      } else {
-        await servico.atualizar(
-          widget.evento!.id,
-          nome.text,
-          local.text,
-          dataInicio.text,
-          dataFim.text,
-        );
-      }
-    } on ErroDeEventos catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        salvando = false;
-        erro = '$e';
-      });
-
-      // A frase da API fica no formulário; o aviso diz que não deu.
-      avisar(context, 'Não deu para salvar', erro: true);
-      return;
-    }
-
+  } on ErroDeEventos catch (e) {
     if (!mounted) return;
 
-    // Deu certo: o aviso verde, e o formulário fecha com true; quem o abriu
-    // pede de novo. O aviso continua na tela da lista.
-    avisar(context, 'Evento salvo');
-    Navigator.pop(context, true);
+    setState(() {
+      salvando = false;
+      erro = '$e';
+    });
+
+    // A frase da API fica no formulário; o aviso diz que não deu.
+    avisar(context, 'Não deu para salvar', erro: true);
+    return;
   }
+
+  if (!mounted) return;
+
+  // Deu certo: o aviso verde, e o formulário fecha com true; quem o abriu
+  // pede de novo. O aviso continua na tela da lista.
+  avisar(context, 'Evento salvo');
+  Navigator.pop(context, true);
+}
+
 
   @override
   void dispose() {
