@@ -27,7 +27,7 @@ class AppDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.menu_book),
-            title: const Text('Eventos'),
+            title: const Text('Livros'),
             onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.eventos),
           ),
           ListTile(

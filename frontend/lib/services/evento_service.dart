@@ -24,19 +24,11 @@ class EventoService {
   final EventoRepository repositorio;
   final SessaoService sessao;
 
-  // A lista inteira, ou só a que passa nos filtros: a busca no nome ('' =
-  // todos) e o "só os disponíveis".
-  Future<List<Evento>> listar({
-    String busca = '',
-    bool soDisponiveis = false,
-  }) async {
+  // A lista inteira, ou só os eventos com a busca no nome ('' = todos).
+  Future<List<Evento>> listar({String busca = ''}) async {
     try {
       // O guarda só abre a tela de eventos com sessão: o token nunca é null aqui.
-      return await repositorio.listar(
-        sessao.token!,
-        busca: busca,
-        soDisponiveis: soDisponiveis,
-      );
+      return await repositorio.listar(sessao.token!, busca: busca);
     } on RecusaDaApi catch (e) {
       throw ErroDeEventos(e.mensagem);
     } on Exception {
