@@ -14,15 +14,15 @@ class EventoRepository {
   final http.Client cliente;
 
   // GET /eventos/, com o token no cabeçalho, como o quemSouEu: a API devolve só
-  // os eventos do dono do token. Com uma busca, o endereço ganha o ?titulo=, e
-  // a API devolve só os eventos com aquele pedaço no título. A resposta é uma
+  // os eventos do dono do token. Com uma busca, o endereço ganha o ?nome=, e
+  // a API devolve só os eventos com aquele pedaço no nome. A resposta é uma
   // LISTA em JSON, e cada item vira um Evento.
   Future<List<Evento>> listar(String token, {String busca = ''}) async {
     var endereco = Uri.parse('$enderecoDaApi/eventos/');
 
     if (busca.isNotEmpty) {
-      // O replace monta o ?titulo=... e codifica o espaço e o acento.
-      endereco = endereco.replace(queryParameters: {'titulo': busca});
+      // O replace monta o ?nome=... e codifica o espaço e o acento.
+      endereco = endereco.replace(queryParameters: {'nome': busca});
     }
 
     final resposta = await cliente.get(

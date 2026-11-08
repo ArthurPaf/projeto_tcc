@@ -1,45 +1,3 @@
-Você é um designer de produto criando o protótipo navegável de uma aplicação.
-
-CONTEXTO
-Sistema de Sistema de gestão de eventos com carteira digital cashless (recarga de saldo e consumo). O usuário principal é Organizadores de evento, atendentes (caixa de recarga), vendedores (barracas/pontos de venda) e clientes (consumidores).
-
-ENTIDADE PRINCIPAL
-Evento, com os campos:
-- id (inteiro, obrigatório)
-- nome (texto, obrigatório)
-- data_inicio (data/hora, obrigatório)
-- data_fim (data/hora, obrigatório)
-- local (texto, obrigatório)
-
-Cada registro pertence a um usuário logado — Um organizador gerencia vários eventos; cada evento possui produtos e transações associadas que pertencem aos clientes, atendentes e vendedores.
-
-TELAS (nesta ordem)
-1. Login: e-mail e senha, link para cadastro, área para mensagem de erro.
-2. Cadastro de usuário: nome, e-mail e senha, com as regras visíveis.
-3. Listagem de Evento: Busca por nome do evento; filtro por período (data de início e fim) e por localização, um botão de criar em destaque, e o
-   estado de lista vazia, com mensagem convidando a criar o primeiro registro.
-4. Formulário de criar/editar Evento, com as validações visíveis.
-5. Detalhe de um registro, com editar e excluir (excluir pede confirmação).
-
-STACK DE DESTINO — leia com atenção
-Este protótipo é descartável, mas ele vira a especificação de um aplicativo
-Flutter que consome uma API FastAPI. Projete pensando nisso:
-- Use Material Design 3 como linguagem visual.
-- Layout em coluna única, pensado primeiro para celular.
-- Não use nada que não tenha equivalente direto em Flutter: sem grid CSS
-  complexo, sem hover como única forma de revelar informação, sem sticky.
-- Todo estado de tela precisa existir e estar desenhado: carregando, vazio,
-  erro e sucesso.
-
-RESTRIÇÕES
-- Não crie backend, banco de dados nem autenticação real: use dados de
-  exemplo fixos, inventados.
-- Não invente campos que não estão na lista acima.
-- Todos os textos da interface em português do Brasil.
-
-
-
-
 # Gerenciador de Eventos — o evento tem dono
 
 O projeto com login e migrações, mais o que o checkpoint pede: o evento ganha **dono** (um usuário tem muitos eventos), cada pessoa enxerga e mexe só no próprio calendário, a listagem tem **busca e filtro** (por nome e local), e o `422` explica o que está errado em português. A coluna nova entrou por uma **migração** — o `create_all` não existe mais.
@@ -51,19 +9,22 @@ Uma API robusta desenvolvida com **FastAPI**, **SQLAlchemy** e **Pydantic** para
 ## Como rodar
 
 ```bash
+cd backend
 poetry install
 ```
 
-Renomeie o arquivo `env.exemplo` para `.env` e configure as variáveis de ambiente (como a URL do banco PostgreSQL e a `SECRET_KEY` para geração dos tokens).
+Na pasta `backend/`, copie o arquivo `.env.exemplo` para `.env` e configure as variáveis de ambiente. O exemplo usa SQLite para rodar localmente; para usar PostgreSQL, informe a URL do seu banco em `DATABASE_URL`. Substitua a `SECRET_KEY` por uma chave secreta própria com mais de 32 caracteres.
 
 ```bash
 poetry run alembic upgrade head
 poetry run uvicorn app.main:app --reload
 ```
 
-O `upgrade head` aplica as migrações necessárias para estruturar o banco de dados (PostgreSQL), incluindo o relacionamento do `dono_id`. Depois, abra a documentação interativa em <http://127.0.0>.
+O `upgrade head` aplica as migrações necessárias para estruturar o banco de dados, incluindo o relacionamento do `dono_id`. Depois, abra a [documentação interativa da API](http://127.0.0.1:8000/docs).
 
 ## Como rodar o app
+
+Abra outro terminal na raiz do repositório para executar os comandos abaixo.
 
 Suba a API antes (ela precisa estar na porta 8000).
 
@@ -75,7 +36,7 @@ flutter run -d chrome
 
 As telas têm nome (`lib/routes.dart`) e o `main.dart` liga cada nome à tela. As telas de dentro do app passam pelo `RotaProtegida`: sem sessão, mostram o login.
 
-A sessão (`SessaoService`) fica no topo do app, num `ChangeNotifierProvider`, e as telas a leem com `context.read` e `context.watch`: nenhuma recebe a sessão pelo construtor. O token vive só na memória: recarregar a página (F5) sai do app.
+A sessão (`SessaoService`) fica no topo do app, num `ChangeNotifierProvider`, e as telas a leem com `context.read` e `context.watch`: nenhuma recebe a sessão pelo construtor. O token é persistido e validado novamente ao recarregar a página.
 
 O cadastro chama `POST /usuarios/` pelas mesmas camadas do login e já entra com a conta nova. Quando a API recusa (e-mail repetido, campo inválido), a frase aparece na tela.
 
@@ -87,3 +48,85 @@ Ao tocar em um evento, o aplicativo abre a tela de detalhes pela rota /evento, p
 O app cria, edita e exclui eventos pelas camadas (tela, `EventoService`, `EventoRepository`), com o token no cabeçalho: `POST /eventos/`, `PATCH /eventos/{id}` e `DELETE /eventos/{id}`. Um formulário só (`FormularioScreen`) serve para criar e para editar, com os campos `nome`, `local`, `data_inicio` e `data_fim`.
 
 A validação acontece nas duas pontas: o `validator` de cada campo antes de enviar, e a API, que recusa com 422 ou 409; a frase da API aparece na tela. Excluir pede confirmação num diálogo. Depois de cada operação, a tela fecha com `true`, e a lista pede os eventos de novo.
+
+## Organização das pastas
+
+```text
+backend/
+|-- alembic/
+|-- app/
+|   |-- eventos/          # models, schemas, controller, service, repository e erros
+|   |-- usuarios/
+|   |-- database.py
+|   |-- seguranca.py
+|   +-- main.py
+|-- tests/
+|   +-- test_eventos.py
+|-- conftest.py
+|-- .env.exemplo
+|-- alembic.ini
+|-- pyproject.toml
++-- poetry.lock
+frontend/
+|-- lib/
+|   |-- models/
+|   |-- repositories/
+|   |-- services/
+|   |-- screens/
+|   |-- widgets/
+|   |-- routes.dart
+|   +-- main.dart
++-- test/
+    |-- screens_test.dart
+    |-- formulario_test.dart
+    +-- lista_test.dart
+docs/
+prototipo/
+```
+
+## Testes
+
+Não precisa da API no ar nem do navegador. Instale as dependências antes:
+`poetry install` em `backend/` e `flutter pub get` em `frontend/`.
+O projeto usa Python 3.14 ou superior e Poetry.
+
+Na pasta `backend/`:
+
+```powershell
+poetry run pytest
+```
+
+São nove testes de endpoint: criar (201), recusar sem token (401), isolar os
+eventos por dono, editar (200), excluir (204), evento inexistente (404), fim
+anterior ao início (409), busca por nome e senha errada (401).
+
+O `TestClient` executa o controller, o service e o repository reais.
+O `conftest.py` configura `teste.db` e a chave de token antes de importar o
+app. Cada teste começa com tabelas vazias; ao terminar, as tabelas e o arquivo
+de teste são removidos. O banco do `.env` não é usado.
+
+A RN02 de eventos (fim depois do início) substitui a regra de título repetido
+da biblioteca do professor, conforme a orientação de usar uma regra da sua
+entidade. As datas dos testes da API são relativas ao dia da execução para
+não ficarem no passado.
+
+Na pasta `frontend/`:
+
+```powershell
+flutter test
+```
+
+Para executar separadamente os arquivos novos da aula:
+
+```powershell
+flutter test test/formulario_test.dart
+flutter test test/lista_test.dart
+```
+
+Os dois testes do formulário conferem os quatro campos obrigatórios e a
+remoção das mensagens de nome e local quando preenchidos. Os dois testes da
+lista usam `MockClient` para devolver um evento ou uma lista vazia.
+A suíte anterior foi preservada em `test/screens_test.dart`.
+
+Veja o roteiro para observar os testes passando e falhando em
+[Encontro 14 — testes](docs/encontro-14-testes.md).
