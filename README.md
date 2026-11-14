@@ -185,16 +185,32 @@ e inicia a API pelo `backend/Dockerfile`. O container aplica as migrações ante
 de iniciar o Uvicorn em `0.0.0.0`, na porta indicada por `PORT` (padrão 8000).
 Para parar sem apagar os dados: `docker compose down`.
 
+## No ar
+
+- O app: [https://projeto-tcc-1.onrender.com](https://projeto-tcc-1.onrender.com)
+- A API: [https://projeto-tcc-sk89.onrender.com/docs](https://projeto-tcc-sk89.onrender.com/docs)
+
+No plano gratuito, a API pode entrar em repouso após 15 minutos sem uso.
+O primeiro acesso pode levar cerca de um minuto enquanto o serviço inicia.
+Espere e tente novamente se o primeiro pedido não responder.
+
+O endereço e as credenciais do banco ficam apenas nas variáveis protegidas
+da hospedagem, em `DATABASE_URL`. Eles não são publicados neste README.
+
+### Prova do sistema inteiro
+
+Abra o app em uma janela anônima e confira:
+
+- [ ] Criar uma conta e entrar pelo endereço público.
+- [ ] Cadastrar um evento com início no futuro e fim depois do início.
+- [ ] Buscar parte do nome e localizar o evento criado.
+- [ ] Fechar a aba, abrir o app novamente, entrar se necessário e confirmar
+  que o evento continua disponível.
+
+Essa prova de cadastro e persistência deve ser concluída pelo navegador
+público; os testes automatizados locais não substituem essa etapa.
+
 ## Publicação na web
-
-**Pendente:** os endereços reais serão preenchidos depois da publicação e da
-verificação de cadastro, login e criação de evento pelo navegador público.
-
-| Componente | Endereço / situação |
-|---|---|
-| Aplicativo | Ainda não publicado |
-| API / documentação | Ainda não publicada |
-| Banco PostgreSQL | Ainda não provisionado; endereço privado configurado em DATABASE_URL |
 
 ### Publicar a API
 
@@ -241,8 +257,8 @@ Depois de mudar `API_URL`, gere e publique um novo build.
 Abra o endereço público em uma janela anônima e confira: criar conta, entrar,
 criar, consultar, editar, buscar, provocar uma recusa de validação, excluir e
 sair. Entre com outra conta e confirme que ela não vê os eventos da primeira.
-Reinicie a API e confirme que os dados continuam no PostgreSQL. Só então
-substitua os estados pendentes na tabela acima pelos endereços reais.
+Reinicie a API e confirme que os dados continuam no PostgreSQL. Depois de
+concluir a prova pelo navegador, marque os itens da seção “No ar”.
 
 ## Apresentação e acompanhamento da rubrica
 
@@ -250,5 +266,6 @@ O histórico já tem commits em mais de quatro dias diferentes. O roteiro de
 apresentação e a relação de cada critério com o código ficam em
 [Rubrica e apresentação](docs/rubrica-e-apresentacao.md).
 A nota da apresentação depende da demonstração e da explicação do código;
-nenhum checklist substitui essa etapa. A nuvem permanece pendente até a
-publicação e a conferência pelos endereços públicos.
+nenhum checklist substitui essa etapa. Os endereços públicos estão na seção
+“No ar”; a comprovação completa da nuvem inclui a prova de cadastro e
+persistência indicada nessa seção.
