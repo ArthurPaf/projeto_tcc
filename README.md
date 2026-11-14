@@ -1,94 +1,138 @@
-# Gerenciador de Eventos — o evento tem dono
+# Gerenciador de Eventos
 
-O projeto com login e migrações, mais o que o checkpoint pede: o evento ganha **dono** (um usuário tem muitos eventos), cada pessoa enxerga e mexe só no próprio calendário, a listagem tem **busca e filtro** (por nome e local), e o `422` explica o que está errado em português. A coluna nova entrou por uma **migração** — o `create_all` não existe mais.
+Aplicativo Flutter com API FastAPI e banco relacional. Cada organizador cria
+uma conta, entra no sistema e gerencia apenas os próprios eventos.
 
-## O que é
+## Checklist das seis funcionalidades
 
-Uma API robusta desenvolvida com **FastAPI**, **SQLAlchemy** e **Pydantic** para gestão personalizada de compromissos. O sistema implementa o padrão *multi-tenant* no nível de aplicação, garantindo o isolamento total dos dados: um usuário autenticado jamais consegue visualizar, editar ou apagar eventos criados por outras pessoas. 
+- [x] **Autenticação:** cadastro e login no app e na API, senha em hash bcrypt,
+  token JWT e sessão persistida no aparelho.
+- [x] **CRUD:** criar, listar, consultar detalhe, editar e excluir eventos,
+  com confirmação antes de excluir.
+- [x] **Relacionamento:** o dono vem do token; cada usuário só consulta,
+  edita e exclui os próprios eventos.
+- [x] **Validação:** campos e datas conferidos no formulário e novamente
+  na API, com mensagens de recusa.
+- [x] **Busca:** campo na lista; a API filtra os eventos pelo nome.
+- [x] **Feedback:** avisos de sucesso e de erro nas ações de cadastro,
+  login, busca, criação, edição, exclusão e saída.
 
-## Como rodar
-
-```bash
-cd backend
-poetry install
-```
-
-Na pasta `backend/`, copie o arquivo `.env.exemplo` para `.env` e configure as variáveis de ambiente. O exemplo usa SQLite para rodar localmente; para usar PostgreSQL, informe a URL do seu banco em `DATABASE_URL`. Substitua a `SECRET_KEY` por uma chave secreta própria com mais de 32 caracteres.
-
-```bash
-poetry run alembic upgrade head
-poetry run uvicorn app.main:app --reload
-```
-
-O `upgrade head` aplica as migrações necessárias para estruturar o banco de dados, incluindo o relacionamento do `dono_id`. Depois, abra a [documentação interativa da API](http://127.0.0.1:8000/docs).
-
-## Como rodar o app
-
-Abra outro terminal na raiz do repositório para executar os comandos abaixo.
-
-Suba a API antes (ela precisa estar na porta 8000).
-
-```
-cd frontend
-flutter pub get
-flutter run -d chrome
-```
-
-As telas têm nome (`lib/routes.dart`) e o `main.dart` liga cada nome à tela. As telas de dentro do app passam pelo `RotaProtegida`: sem sessão, mostram o login.
-
-A sessão (`SessaoService`) fica no topo do app, num `ChangeNotifierProvider`, e as telas a leem com `context.read` e `context.watch`: nenhuma recebe a sessão pelo construtor. O token é persistido e validado novamente ao recarregar a página.
-
-O cadastro chama `POST /usuarios/` pelas mesmas camadas do login e já entra com a conta nova. Quando a API recusa (e-mail repetido, campo inválido), a frase aparece na tela.
-
-O token fica no aparelho (`shared_preferences`, que no navegador é o `localStorage`), num repositório próprio, o `TokenRepository`. O `main` o restaura antes de abrir o app: se a API ainda o aceita, o F5 não derruba a sessão. O Sair apaga o token.
-
-A tela de eventos chama GET /eventos/ pelas camadas do aplicativo (tela, EventoService, EventoRepository), com o token no cabeçalho, e mostra apenas os eventos de quem está logado, exibindo nome, local, data de início e data de fim. Ela possui quatro estados: carregando, erro (com botão Tentar de novo), lista vazia e listagem dos eventos.
-Ao tocar em um evento, o aplicativo abre a tela de detalhes pela rota /evento, passando o ID nos arguments. A tela consulta a API (GET /eventos/{id}) para buscar e apresentar os dados atualizados do evento.
-
-O app cria, edita e exclui eventos pelas camadas (tela, `EventoService`, `EventoRepository`), com o token no cabeçalho: `POST /eventos/`, `PATCH /eventos/{id}` e `DELETE /eventos/{id}`. Um formulário só (`FormularioScreen`) serve para criar e para editar, com os campos `nome`, `local`, `data_inicio` e `data_fim`.
-
-A validação acontece nas duas pontas: o `validator` de cada campo antes de enviar, e a API, que recusa com 422 ou 409; a frase da API aparece na tela. Excluir pede confirmação num diálogo. Depois de cada operação, a tela fecha com `true`, e a lista pede os eventos de novo.
-
-## Organização das pastas
+## Organização
 
 ```text
 backend/
-|-- alembic/
 |-- app/
-|   |-- eventos/          # models, schemas, controller, service, repository e erros
-|   |-- usuarios/
-|   |-- database.py
-|   |-- seguranca.py
+|   |-- eventos/      # models, schemas, datas, controller, service, repository, erros
+|   |-- usuarios/     # models, schemas, controller, service, repository, erros
+|   |-- database.py   # conexão e fábrica de sessões
+|   |-- seguranca.py  # hash e verificação de JWT
 |   +-- main.py
-|-- tests/
-|   +-- test_eventos.py
-|-- conftest.py
+|-- alembic/          # migrações
+|-- tests/            # testes de endpoint
+|-- conftest.py       # banco exclusivo dos testes
+|-- Dockerfile
+|-- .dockerignore     # exclui segredos, banco local e caches da imagem
 |-- .env.exemplo
-|-- alembic.ini
 |-- pyproject.toml
 +-- poetry.lock
 frontend/
 |-- lib/
 |   |-- models/
 |   |-- repositories/
-|   |-- services/
+|   |-- services/     # regras de sessão, eventos e validação
 |   |-- screens/
 |   |-- widgets/
 |   |-- routes.dart
 |   +-- main.dart
-+-- test/
-    |-- screens_test.dart
-    |-- formulario_test.dart
-    +-- lista_test.dart
++-- test/             # testes de widget e regras do app
+compose.yaml          # API e PostgreSQL com volume persistente
+.env.exemplo          # configuração do Compose, sem credenciais
 docs/
 prototipo/
 ```
 
+As rotas chamam os services; os services chamam os repositories. Somente os
+repositories abrem sessões e fazem consultas ou gravações no banco. Os models
+descrevem as tabelas e os schemas validam os dados de entrada e saída.
+No aplicativo, as telas chamam os services; apenas os repositories fazem HTTP.
+
+## Rodar localmente
+
+Requisitos: Git, Python 3.14 ou superior, Poetry e Flutter compatível com Dart
+3.13.3 ou superior. Execute os comandos a partir da raiz deste repositório.
+Para conferir as ferramentas: `python --version`, `poetry --version` e
+`flutter --version`. Caso falte apenas o Poetry, instale com
+`python -m pip install poetry` (também pode usar `python -m poetry` nos comandos).
+
+### API
+
+No PowerShell:
+
+```powershell
+cd backend
+poetry install
+Copy-Item .env.exemplo .env
+```
+
+No Linux/macOS, use `cp .env.exemplo .env` no lugar de `Copy-Item`.
+Edite o arquivo `backend/.env`: mantenha `DATABASE_URL=sqlite:///./eventos.db`
+para usar SQLite localmente e substitua `SECRET_KEY` por uma chave própria.
+Gere a chave com:
+
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Ainda em `backend/`:
+
+```powershell
+poetry run alembic upgrade head
+poetry run uvicorn app.main:app --reload
+```
+
+API: [documentação interativa](http://127.0.0.1:8000/docs).
+As migrações criam e atualizam as tabelas. O SQLite fica em `backend/eventos.db`.
+Para PostgreSQL, altere `DATABASE_URL` para a URL do banco.
+
+### Aplicativo
+
+Abra outro terminal na raiz do repositório, mantendo a API em execução:
+
+```powershell
+cd frontend
+flutter pub get
+flutter run -d chrome
+```
+
+O endereço local padrão da API é `http://127.0.0.1:8000`. Para usar outro
+endereço, informe `--dart-define=API_URL=https://endereco-da-api`.
+O login e o cadastro guardam o token com `shared_preferences`. A sessão é
+restaurada após recarregar a página quando a API ainda aceita esse token.
+Sair apaga o token. Senhas incorretas e tokens vencidos são recusados.
+
+## Regras e validação
+
+- Nome do evento: de 2 a 120 caracteres; local: de 2 a 50.
+- Nome do usuário: de 2 a 80 caracteres; e-mail válido de até 120 caracteres.
+- Senha: no mínimo 6 caracteres e no máximo 72 bytes em UTF-8. Acentos podem
+  ocupar mais de um byte. O banco armazena somente o hash.
+- As datas aceitam `AAAA-MM-DD`, `AAAA-MM-DDTHH:MM:SS`, `DD/MM/AAAA` ou
+  `DD/MM/AAAA HH:MM` (com segundos opcionais). Datas ISO com fuso também são aceitas.
+- Datas sem fuso representam o horário de Brasília, UTC-03:00. Datas com fuso
+  são convertidas para esse horário antes de salvar. O banco guarda a forma
+  `AAAA-MM-DDTHH:MM:SS`, que também permite ordenar cronologicamente.
+- RN01: um evento novo não pode começar no passado.
+- RN02: o fim deve ser depois do início, inclusive nas edições parciais.
+- RN03: editar só o início não pode ultrapassar o fim já salvo.
+- Campos obrigatórios não aceitam `null` na edição. Omitir um campo mantém o
+  valor anterior. Campos inválidos recebem 422; recusas das regras de negócio,
+  409; eventos inexistentes ou de outro usuário, 404; falha de autenticação, 401.
+- Nomes repetidos são permitidos. Não existe campo de disponibilidade nem
+  proibição de excluir eventos encerrados.
+
 ## Testes
 
-Não precisa da API no ar nem do navegador. Instale as dependências antes:
-`poetry install` em `backend/` e `flutter pub get` em `frontend/`.
-O projeto usa Python 3.14 ou superior e Poetry.
+Não precisa da API no ar nem do navegador. Depois de instalar as dependências:
 
 Na pasta `backend/`:
 
@@ -96,37 +140,112 @@ Na pasta `backend/`:
 poetry run pytest
 ```
 
-São nove testes de endpoint: criar (201), recusar sem token (401), isolar os
-eventos por dono, editar (200), excluir (204), evento inexistente (404), fim
-anterior ao início (409), busca por nome e senha errada (401).
-
-O `TestClient` executa o controller, o service e o repository reais.
-O `conftest.py` configura `teste.db` e a chave de token antes de importar o
-app. Cada teste começa com tabelas vazias; ao terminar, as tabelas e o arquivo
-de teste são removidos. O banco do `.env` não é usado.
-
-A RN02 de eventos (fim depois do início) substitui a regra de título repetido
-da biblioteca do professor, conforme a orientação de usar uma regra da sua
-entidade. As datas dos testes da API são relativas ao dia da execução para
-não ficarem no passado.
+O `conftest.py` define a URL de `teste.db` e a chave do token antes de importar
+o app. Cada teste começa com tabelas vazias e usa o `TestClient`, executando as
+camadas reais. Depois, as tabelas e o banco de teste são removidos. O banco do
+`.env` não é usado. A suíte cobre CRUD, dono, busca, login, datas, edição parcial,
+valores nulos e limites de senha e campos.
 
 Na pasta `frontend/`:
 
 ```powershell
 flutter test
+dart analyze
 ```
 
-Para executar separadamente os arquivos novos da aula:
+Os testes de widget usam HTTP simulado, sem inventar regras adicionais para
+a entidade. O formulário é exercitado com campos vazios, data impossível e fim
+anterior ao início. Há testes de login, cadastro, sessão, lista, detalhe,
+CRUD, busca e feedback. Para executar só o formulário:
 
 ```powershell
 flutter test test/formulario_test.dart
-flutter test test/lista_test.dart
 ```
 
-Os dois testes do formulário conferem os quatro campos obrigatórios e a
-remoção das mensagens de nome e local quando preenchidos. Os dois testes da
-lista usam `MockClient` para devolver um evento ou uma lista vazia.
-A suíte anterior foi preservada em `test/screens_test.dart`.
+## API e PostgreSQL pelo Docker
 
-Veja o roteiro para observar os testes passando e falhando em
-[Encontro 14 — testes](docs/encontro-14-testes.md).
+Requisito adicional: Docker com Compose. Na raiz:
+
+```powershell
+Copy-Item .env.exemplo .env
+```
+
+Gere **dois valores distintos** com o comando de `secrets.token_hex(32)` acima
+e preencha `POSTGRES_PASSWORD` e `SECRET_KEY` no `.env` da raiz. A senha em
+hexadecimal evita caracteres especiais na URL do banco. Para acesso público,
+preencha também `ENDERECO_DO_APP` com a origem HTTPS do aplicativo, sem barra final.
+
+```powershell
+docker compose up --build -d
+docker compose logs -f api
+```
+
+O Compose inicia PostgreSQL com volume persistente, espera o banco ficar pronto
+e inicia a API pelo `backend/Dockerfile`. O container aplica as migrações antes
+de iniciar o Uvicorn em `0.0.0.0`, na porta indicada por `PORT` (padrão 8000).
+Para parar sem apagar os dados: `docker compose down`.
+
+## Publicação na web
+
+**Pendente:** os endereços reais serão preenchidos depois da publicação e da
+verificação de cadastro, login e criação de evento pelo navegador público.
+
+| Componente | Endereço / situação |
+|---|---|
+| Aplicativo | Ainda não publicado |
+| API / documentação | Ainda não publicada |
+| Banco PostgreSQL | Ainda não provisionado; endereço privado configurado em DATABASE_URL |
+
+### Publicar a API
+
+No Render, configure a raiz do serviço como **`backend`** e use o
+`Dockerfile` dessa pasta. Não é necessário instalar Docker no seu computador:
+quem constrói a imagem é a hospedagem. O equivalente local, a partir da raiz
+do repositório, seria:
+
+```powershell
+docker build -t eventos-api ./backend
+```
+
+Provisione um banco PostgreSQL persistente e configure no serviço da API:
+
+- `DATABASE_URL`: URL privada do PostgreSQL fornecida pela hospedagem.
+  O projeto aceita `postgresql://` e normaliza `postgres://`.
+- `SECRET_KEY`: chave aleatória própria, diferente da usada localmente.
+- `ENDERECO_DO_APP`: origem HTTPS exata do app, sem barra final, conforme
+  o tutorial do professor.
+- `CORS_ORIGINS`: opcional, para origens adicionais separadas por vírgula.
+- `PORT`: porta definida pelo provedor, quando exigida.
+
+Não copie arquivos `.env` para a imagem. O `backend/.dockerignore` exclui arquivos de
+ambiente, bancos locais, caches e ambientes virtuais. Use variáveis protegidas
+da hospedagem. Não publique senha ou URL de banco com credenciais no README.
+
+### Publicar o aplicativo
+
+Com a API já acessível por HTTPS, dentro de `frontend/` execute, substituindo
+o endereço pelo endereço **real** da sua API, sem barra final:
+
+```powershell
+flutter pub get
+flutter build web --release --dart-define=API_URL=https://endereco-real-da-api
+```
+
+Publique o conteúdo de `frontend/build/web` em uma hospedagem de arquivos
+estáticos com HTTPS. O aplicativo usa as rotas com `#` do Flutter por padrão.
+Depois de mudar `API_URL`, gere e publique um novo build.
+
+Abra o endereço público em uma janela anônima e confira: criar conta, entrar,
+criar, consultar, editar, buscar, provocar uma recusa de validação, excluir e
+sair. Entre com outra conta e confirme que ela não vê os eventos da primeira.
+Reinicie a API e confirme que os dados continuam no PostgreSQL. Só então
+substitua os estados pendentes na tabela acima pelos endereços reais.
+
+## Apresentação e acompanhamento da rubrica
+
+O histórico já tem commits em mais de quatro dias diferentes. O roteiro de
+apresentação e a relação de cada critério com o código ficam em
+[Rubrica e apresentação](docs/rubrica-e-apresentacao.md).
+A nota da apresentação depende da demonstração e da explicação do código;
+nenhum checklist substitui essa etapa. A nuvem permanece pendente até a
+publicação e a conferência pelos endereços públicos.

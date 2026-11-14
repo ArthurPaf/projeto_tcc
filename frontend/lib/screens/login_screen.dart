@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../routes.dart';
 import '../services/sessao_service.dart';
+import '../widgets/aviso.dart';
 
 // A camada de apresentação: recebe o clique, pede ao service e mostra a resposta.
 class LoginScreen extends StatefulWidget {
@@ -26,13 +27,16 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await context.read<SessaoService>().entrar(email.text, senha.text);
     } on ErroDeLogin catch (e) {
+      if (!mounted) return;
       setState(() {
         carregando = false;
         erro = e.mensagem;
       });
+      avisar(context, 'Não deu para entrar', erro: true);
       return;
     }
     if (!mounted) return;
+    avisar(context, 'Login realizado');
     Navigator.pushReplacementNamed(context, AppRoutes.inicio);
   }
 
@@ -55,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.local_library, size: 72),
+                const Icon(Icons.event, size: 72),
                 const SizedBox(height: 8),
                 const Text(
                   'Entrar',
@@ -96,12 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {},
-                        child: const Text('Esqueci a senha'),
-                      ),
-                    ),
                     Expanded(
                       child: TextButton(
                         onPressed: () {

@@ -1,21 +1,28 @@
-from sqlalchemy.orm import Session
-
+"""Consultas e sessoes da tabela de usuarios ficam nesta camada."""
+from sqlalchemy.exc import IntegrityError
+from ..database import SessionLocal
 from .models import Usuario
-
-# Igual ao de livros: a UNICA parte que sabe que existe uma tabela usuarios.
-
-
-def buscar(db: Session, usuario_id: int):
-    return db.query(Usuario).filter(Usuario.id == usuario_id).first()
+from .erros import EmailJaCadastrado
 
 
-def buscar_por_email(db: Session, email: str):
-    return db.query(Usuario).filter(Usuario.email == email).first()
+def buscar(usuario_id: int):
+    with SessionLocal() as db:
+        return db.get(Usuario, usuario_id)
 
 
-def criar(db: Session, dados: dict):
-    usuario = Usuario(**dados)
-    db.add(usuario)
-    db.commit()
-    db.refresh(usuario)
-    return usuario
+def buscar_por_email(email: str):
+    with SessionLocal() as db:
+        return db.query(Usuario).filter(Usuario.email == email).first()
+
+
+def criar(dados: dict):
+    with SessionLocal() as db:
+        usuario = Usuario(**dados)
+        db.add(usuario)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise EmailJaCadastrado("Ja existe uma conta com este e-mail")
+        db.refresh(usuario)
+        return usuario

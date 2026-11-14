@@ -19,10 +19,7 @@ import jwt
 from dotenv import load_dotenv
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 
-from .database import get_db
-from .usuarios import repository as usuarios_repository
 from .usuarios.erros import CredenciaisInvalidas
 
 load_dotenv()
@@ -44,6 +41,8 @@ def gerar_hash(senha: str) -> str:
 
 def conferir_senha(senha: str, senha_hash: str) -> bool:
     """Refaz a impressao digital e compara. A senha guardada nunca aparece."""
+    if len(senha.encode("utf-8")) > 72:
+        return False
     return bcrypt.checkpw(senha.encode(), senha_hash.encode())
 
 def criar_token(usuario_id: int) -> str:
@@ -56,15 +55,17 @@ def criar_token(usuario_id: int) -> str:
 
 def get_current_user(
     token: str = Depends(esquema_oauth),
-    db: Session = Depends(get_db),
 ):
     """O porteiro. Le o cracha', confere a assinatura e busca quem e'."""
     try:
-        dados = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
-    except jwt.PyJWTError:
+        dados = jwt.decode(
+            token, SECRET_KEY, algorithms=[ALGORITMO],
+            options={"require": ["sub", "exp"]},
+        )
+        usuario_id = int(dados["sub"])
+    except (jwt.PyJWTError, ValueError, TypeError):
         raise CredenciaisInvalidas("Token invalido ou vencido")
 
-    usuario = usuarios_repository.buscar(db, int(dados["sub"]))
-    if usuario is None:
-        raise CredenciaisInvalidas("O usuario deste token nao existe mais")
-    return usuario
+    # Import local evita o ciclo: service também usa as funções de senha.
+    from .usuarios import service
+    return service.buscar_usuario_do_token(usuario_id)

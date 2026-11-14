@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../routes.dart';
 import '../services/sessao_service.dart';
+import '../services/validacao_usuario.dart';
+import '../widgets/aviso.dart';
 
 // A tela de cadastro, pelo mesmo caminho da de login: recebe o clique, pede
 // ao service e mostra a resposta. O erro que a API mandou aparece em vermelho.
@@ -21,24 +23,36 @@ class _CadastroScreenState extends State<CadastroScreen> {
   String? erro;
 
   Future<void> cadastrar() async {
+    final mensagem =
+        validarNomeUsuario(nome.text) ??
+        validarEmail(email.text) ??
+        validarSenha(senha.text);
+    if (mensagem != null) {
+      setState(() => erro = mensagem);
+      avisar(context, 'Confira os dados do cadastro', erro: true);
+      return;
+    }
     setState(() {
       carregando = true;
       erro = null;
     });
     try {
       await context.read<SessaoService>().cadastrar(
-        nome.text,
-        email.text,
+        nome.text.trim(),
+        email.text.trim(),
         senha.text,
       );
     } on ErroDeCadastro catch (e) {
+      if (!mounted) return;
       setState(() {
         carregando = false;
         erro = e.mensagem;
       });
+      avisar(context, 'Não deu para cadastrar', erro: true);
       return;
     }
     if (!mounted) return;
+    avisar(context, 'Conta criada');
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.inicio,
@@ -93,7 +107,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
                   controller: senha,
                   decoration: const InputDecoration(
                     labelText: 'Senha',
-                    helperText: 'Pelo menos 6 caracteres',
+                    helperText: 'Mínimo de 6 caracteres, máximo de 72 bytes',
                     border: OutlineInputBorder(),
                   ),
                   obscureText: true,

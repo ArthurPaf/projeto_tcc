@@ -69,7 +69,10 @@ SessaoService sessaoDeMentira({Map<String, Object> guardado = const {}}) {
       final email = pedido.bodyFields['username'];
       if (contas[email]?['senha'] == pedido.bodyFields['password']) {
         return http.Response(
-          jsonEncode({'access_token': 'token-de-$email', 'token_type': 'bearer'}),
+          jsonEncode({
+            'access_token': 'token-de-$email',
+            'token_type': 'bearer',
+          }),
           200,
         );
       }
@@ -94,8 +97,22 @@ SessaoService sessaoDeMentira({Map<String, Object> guardado = const {}}) {
 
 // Dois eventos da Ana, na forma do EventoPublico que a API devolve.
 const doisEventos = [
-  {'id': 1, 'nome': 'Festival de Música', 'local': 'Praça Central', 'data_inicio': '2026-11-10', 'data_fim': '2026-11-11', 'disponivel': true, 'dono_id': 1},
-  {'id': 2, 'nome': 'Feira de Tecnologia', 'local': 'Centro de Convenções', 'data_inicio': '2026-11-20', 'data_fim': '2026-11-21', 'disponivel': false, 'dono_id': 1},
+  {
+    'id': 1,
+    'nome': 'Festival de Música',
+    'local': 'Praça Central',
+    'data_inicio': '2090-11-10',
+    'data_fim': '2090-11-11',
+    'dono_id': 1,
+  },
+  {
+    'id': 2,
+    'nome': 'Feira de Tecnologia',
+    'local': 'Centro de Convenções',
+    'data_inicio': '2090-11-20',
+    'data_fim': '2090-11-21',
+    'dono_id': 1,
+  },
 ];
 
 // A API de eventos de mentira: o GET /eventos/ responde com este status e este
@@ -107,29 +124,50 @@ http.Client apiDeEventos(int status, Object corpo) {
     if (pedido.headers['Authorization'] == null) {
       return http.Response('{"detail": "Not authenticated"}', 401);
     }
-    final id = pedido.url.pathSegments.last; // '' em /eventos/, '2' em /eventos/2
+    final id =
+        pedido.url.pathSegments.last; // '' em /eventos/, '2' em /eventos/2
     if (id.isNotEmpty) {
       for (final evento in doisEventos) {
         if ('${evento['id']}' == id) {
           return http.Response(jsonEncode(evento), 200);
         }
       }
-      return http.Response('{"detail": "Evento $id nao esta na sua agenda"}', 404);
+      return http.Response(
+        '{"detail": "Evento $id nao esta na sua agenda"}',
+        404,
+      );
     }
     return http.Response(jsonEncode(corpo), status);
   });
 }
 
 // A agenda de mentira, para criar, editar e excluir: ela guarda o que recebe,
-// e responde como a API de verdade, com as recusas dela (o nome repetido e
-// o evento encerrado, 409). Começa com os dois eventos da Ana.
+// pode simular token vencido (401) ou um evento removido por outra aba (404).
+// As regras de datas e de dono sao verificadas nos testes da API real.
 // O GET /eventos/?nome=... filtra os eventos pelo nome.
 Uri? ultimoEndereco;
 
-http.Client agendaDeMentira() {
+http.Client agendaDeMentira({
+  bool recusarGravacao = false,
+  bool eventoRemovido = false,
+}) {
   final List<Map<String, dynamic>> agenda = [
-    {'id': 1, 'nome': 'Festival de Música', 'local': 'Praça Central', 'data_inicio': '2026-11-10', 'data_fim': '2026-11-11', 'disponivel': true, 'dono_id': 1},
-    {'id': 2, 'nome': 'Feira de Tecnologia', 'local': 'Centro de Convenções', 'data_inicio': '2026-11-20', 'data_fim': '2026-11-21', 'disponivel': false, 'dono_id': 1},
+    {
+      'id': 1,
+      'nome': 'Festival de Música',
+      'local': 'Praça Central',
+      'data_inicio': '2090-11-10',
+      'data_fim': '2090-11-11',
+      'dono_id': 1,
+    },
+    {
+      'id': 2,
+      'nome': 'Feira de Tecnologia',
+      'local': 'Centro de Convenções',
+      'data_inicio': '2090-11-20',
+      'data_fim': '2090-11-21',
+      'dono_id': 1,
+    },
   ];
   return MockClient((pedido) async {
     pedidos++;
@@ -137,13 +175,18 @@ http.Client agendaDeMentira() {
     final id = int.tryParse(pedido.url.pathSegments.last); // null em /eventos/
     if (pedido.method == 'POST' || pedido.method == 'PATCH') {
       final dados = jsonDecode(pedido.body);
-      for (final evento in agenda) {
-        if (evento['nome'] == dados['nome'] && evento['id'] != id) {
-          return http.Response('{"detail": "Ja existe um evento chamado ${dados['nome']}"}', 409);
-        }
+      if (recusarGravacao) {
+        return http.Response('{"detail": "Token invalido ou vencido"}', 401);
       }
       if (pedido.method == 'POST') {
-        final novo = {'id': 3, 'nome': dados['nome'], 'local': dados['local'], 'data_inicio': dados['data_inicio'], 'data_fim': dados['data_fim'], 'disponivel': true, 'dono_id': 1};
+        final novo = {
+          'id': 3,
+          'nome': dados['nome'],
+          'local': dados['local'],
+          'data_inicio': dados['data_inicio'],
+          'data_fim': dados['data_fim'],
+          'dono_id': 1,
+        };
         agenda.add(novo);
         return http.Response(jsonEncode(novo), 201);
       }
@@ -159,8 +202,11 @@ http.Client agendaDeMentira() {
     for (final evento in agenda) {
       if (evento['id'] == id) {
         if (pedido.method == 'DELETE') {
-          if (evento['disponivel'] == false) {
-            return http.Response('{"detail": "Evento $id esta encerrado"}', 409);
+          if (eventoRemovido && id == 2) {
+            return http.Response(
+              '{"detail": "Evento $id nao esta no seu calendario"}',
+              404,
+            );
           }
           agenda.remove(evento);
           return http.Response('', 204);
@@ -171,7 +217,10 @@ http.Client agendaDeMentira() {
         return http.Response(jsonEncode(evento), 200);
       }
     }
-    return http.Response('{"detail": "Evento $id nao esta na sua agenda"}', 404);
+    return http.Response(
+      '{"detail": "Evento $id nao esta na sua agenda"}',
+      404,
+    );
   });
 }
 
@@ -179,7 +228,9 @@ http.Client agendaDeMentira() {
 // O .value entrega ao Provider um objeto que já existe, em vez de criá-lo.
 // Sem a API de eventos, a de mentira responde uma lista vazia.
 Widget appDeMentira(SessaoService sessao, {http.Client? eventos}) {
-  final repositorio = EventoRepository(cliente: eventos ?? apiDeEventos(200, []));
+  final repositorio = EventoRepository(
+    cliente: eventos ?? apiDeEventos(200, []),
+  );
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: sessao),
@@ -202,7 +253,11 @@ Future<void> abrirOMenu(WidgetTester tester) async {
 }
 
 // Abre o cadastro pelo link do login e preenche os três campos.
-Future<void> preencherECadastrar(WidgetTester tester, String email, String senha) async {
+Future<void> preencherECadastrar(
+  WidgetTester tester,
+  String email,
+  String senha,
+) async {
   await tester.tap(find.text('Criar uma conta'));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField).at(0), 'Bia');
@@ -239,13 +294,20 @@ Future<void> buscar(WidgetTester tester, String texto) async {
 Future<void> excluirRespondendo(WidgetTester tester, String resposta) async {
   await tester.tap(find.text('Excluir'));
   await tester.pumpAndSettle();
-  await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text(resposta)));
+  await tester.tap(
+    find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(resposta),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
 // A Ana já entrou (a sessão restaurada, como o main faz) e toca em Ver os eventos.
 Future<void> abrirOsEventos(WidgetTester tester, http.Client eventos) async {
-  final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+  final sessao = sessaoDeMentira(
+    guardado: {'token': 'token-de-ana@eventos.com'},
+  );
   await sessao.restaurar();
   await tester.pumpWidget(appDeMentira(sessao, eventos: eventos));
   await tester.tap(find.text('Ver os eventos'));
@@ -260,11 +322,15 @@ Future<String?> tokenGuardado() async {
 
 // Confere que o cadastro foi recusado, com esta frase para a tela.
 Matcher recusadoCom(String frase) {
-  return throwsA(isA<ErroDeCadastro>().having((e) => e.mensagem, 'mensagem', frase));
+  return throwsA(
+    isA<ErroDeCadastro>().having((e) => e.mensagem, 'mensagem', frase),
+  );
 }
 
 void main() {
-  testWidgets('a tela de login tem e-mail, senha e o botão Entrar', (tester) async {
+  testWidgets('a tela de login tem e-mail, senha e o botão Entrar', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     expect(find.byType(TextField), findsNWidgets(2));
@@ -279,17 +345,22 @@ void main() {
     expect(find.widgetWithText(ElevatedButton, 'Cadastrar'), findsOneWidget);
   });
 
-  testWidgets('com a senha certa, a rota /inicio abre a tela inicial', (tester) async {
+  testWidgets('com a senha certa, a rota /inicio abre a tela inicial', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     await preencherEEntrar(tester, 'segredo123');
 
+    expect(find.widgetWithText(SnackBar, 'Login realizado'), findsOneWidget);
     expect(find.byType(InicioScreen), findsOneWidget);
     expect(find.text('Olá, Ana!'), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('com a senha errada, fica no login e mostra o erro', (tester) async {
+  testWidgets('com a senha errada, fica no login e mostra o erro', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     await preencherEEntrar(tester, 'senha-errada');
@@ -298,7 +369,9 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('o link Criar uma conta abre o cadastro pelo nome da rota', (tester) async {
+  testWidgets('o link Criar uma conta abre o cadastro pelo nome da rota', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     await tester.tap(find.text('Criar uma conta'));
@@ -307,17 +380,22 @@ void main() {
     expect(find.byType(CadastroScreen), findsOneWidget);
   });
 
-  testWidgets('cadastrar pela tela cria a conta e abre a tela inicial', (tester) async {
+  testWidgets('cadastrar pela tela cria a conta e abre a tela inicial', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     await preencherECadastrar(tester, 'bia@eventos.com', 'segredo456');
 
+    expect(find.widgetWithText(SnackBar, 'Conta criada'), findsOneWidget);
     expect(find.byType(InicioScreen), findsOneWidget);
     expect(find.text('Olá, Bia!'), findsOneWidget);
     expect(find.byType(CadastroScreen), findsNothing);
   });
 
-  testWidgets('e-mail repetido: a tela mostra o erro e fica no cadastro', (tester) async {
+  testWidgets('e-mail repetido: a tela mostra o erro e fica no cadastro', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
     await preencherECadastrar(tester, 'ana@eventos.com', 'segredo456');
@@ -339,34 +417,50 @@ void main() {
     expect(find.byType(CadastroScreen), findsNothing);
   });
 
-  testWidgets('o guarda: sem sessão, a rota /inicio mostra o login', (tester) async {
+  testWidgets('o guarda: sem sessão, a rota /inicio mostra o login', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
 
-    Navigator.of(tester.element(find.byType(LoginScreen))).pushNamed(AppRoutes.inicio);
+    Navigator.of(tester.element(find.byType(LoginScreen)))
+        .pushNamed(AppRoutes.inicio);
     await tester.pumpAndSettle();
 
     expect(find.byType(InicioScreen), findsNothing);
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('o menu mostra o nome sem receber nada pelo construtor', (tester) async {
+  testWidgets('o menu mostra o nome sem receber nada pelo construtor', (
+    tester,
+  ) async {
     await tester.pumpWidget(appDeMentira(sessaoDeMentira()));
     await preencherEEntrar(tester, 'segredo123');
 
     await abrirOMenu(tester);
     final menu = find.byType(Drawer);
-    expect(find.descendant(of: menu, matching: find.text('Ana')), findsOneWidget);
-    expect(find.descendant(of: menu, matching: find.text('ana@eventos.com')), findsOneWidget);
+    expect(
+      find.descendant(of: menu, matching: find.text('Ana')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: menu, matching: find.text('ana@eventos.com')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.descendant(of: menu, matching: find.text('Perfil')));
     await tester.pumpAndSettle();
 
     expect(find.byType(PerfilScreen), findsOneWidget);
     await abrirOMenu(tester);
-    expect(find.descendant(of: find.byType(Drawer), matching: find.text('Ana')), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Drawer), matching: find.text('Ana')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('sair volta ao login, limpa a pilha e apaga a sessão', (tester) async {
+  testWidgets('sair volta ao login, limpa a pilha e apaga a sessão', (
+    tester,
+  ) async {
     final sessao = sessaoDeMentira();
     await tester.pumpWidget(appDeMentira(sessao));
     await preencherEEntrar(tester, 'segredo123');
@@ -379,15 +473,23 @@ void main() {
     await tester.tap(find.text('Sair'));
     await tester.pumpAndSettle();
 
+    expect(find.widgetWithText(SnackBar, 'Você saiu da conta'), findsOneWidget);
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.byType(EventosScreen), findsNothing);
-    expect(Navigator.of(tester.element(find.byType(LoginScreen))).canPop(), isFalse);
+    expect(
+      Navigator.of(tester.element(find.byType(LoginScreen))).canPop(),
+      isFalse,
+    );
     expect(sessao.logado, isFalse);
     expect(await tokenGuardado(), isNull);
   });
 
-  testWidgets('com a sessão restaurada, o app abre direto na tela inicial', (tester) async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+  testWidgets('com a sessão restaurada, o app abre direto na tela inicial', (
+    tester,
+  ) async {
+    final sessao = sessaoDeMentira(
+      guardado: {'token': 'token-de-ana@eventos.com'},
+    );
     await sessao.restaurar();
 
     await tester.pumpWidget(appDeMentira(sessao));
@@ -397,7 +499,9 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
   });
 
-  testWidgets('o watch redesenha a tela quando o service avisa', (tester) async {
+  testWidgets('o watch redesenha a tela quando o service avisa', (
+    tester,
+  ) async {
     final sessao = sessaoDeMentira();
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
@@ -421,7 +525,9 @@ void main() {
   });
 
   // Os quatro estados da tela de eventos: a lista, a vazia, o erro e o carregando.
-  testWidgets('a tela de eventos mostra a lista: um ListTile por evento', (tester) async {
+  testWidgets('a tela de eventos mostra a lista: um ListTile por evento', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
 
     expect(find.byType(ListTile), findsNWidgets(2));
@@ -429,14 +535,18 @@ void main() {
     expect(find.text('Centro de Convenções'), findsOneWidget);
   });
 
-  testWidgets('sem evento nenhum, a tela diz que a lista está vazia', (tester) async {
+  testWidgets('sem evento nenhum, a tela diz que a lista está vazia', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, apiDeEventos(200, []));
 
     expect(find.text('Nenhum evento ainda.'), findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
   });
 
-  testWidgets('com a API parada, o erro; o Tentar de novo pede outra vez', (tester) async {
+  testWidgets('com a API parada, o erro; o Tentar de novo pede outra vez', (
+    tester,
+  ) async {
     var noAr = false;
     final eventos = MockClient((pedido) async {
       if (!noAr) {
@@ -446,7 +556,10 @@ void main() {
     });
     await abrirOsEventos(tester, eventos);
     expect(find.text('Não consegui carregar os eventos'), findsOneWidget);
-    expect(find.text('Não consegui falar com a API. O uvicorn está rodando?'), findsOneWidget);
+    expect(
+      find.text('Não consegui falar com a API. O uvicorn está rodando?'),
+      findsOneWidget,
+    );
 
     noAr = true;
     await tester.tap(find.widgetWithText(ElevatedButton, 'Tentar de novo'));
@@ -456,9 +569,13 @@ void main() {
     expect(find.text('Tentar de novo'), findsNothing);
   });
 
-  testWidgets('enquanto a resposta não chega, a tela mostra o carregando', (tester) async {
+  testWidgets('enquanto a resposta não chega, a tela mostra o carregando', (
+    tester,
+  ) async {
     final resposta = Completer<http.Response>();
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+    final sessao = sessaoDeMentira(
+      guardado: {'token': 'token-de-ana@eventos.com'},
+    );
     await sessao.restaurar();
     await tester.pumpWidget(
       appDeMentira(sessao, eventos: MockClient((pedido) => resposta.future)),
@@ -477,34 +594,44 @@ void main() {
     expect(find.text('Festival de Música'), findsOneWidget);
   });
 
-  testWidgets('tocar num evento abre o detalhe, que busca o evento na API pelo id', (tester) async {
+  testWidgets(
+    'tocar num evento abre o detalhe, que busca o evento na API pelo id',
+    (tester) async {
+      await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+      pedidos = 0;
+
+      await tester.tap(find.text('Feira de Tecnologia'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EventoScreen), findsOneWidget);
+      expect(find.text('2090-11-20'), findsOneWidget);
+      expect(find.text('Centro de Convenções'), findsOneWidget);
+      expect(pedidos, 1);
+    },
+  );
+
+  testWidgets(
+    'o detalhe de um evento que não existe mais mostra o erro da API',
+    (tester) async {
+      await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
+
+      Navigator.of(tester.element(find.byType(EventosScreen)))
+          .pushNamed(AppRoutes.evento, arguments: 99);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Não consegui carregar o evento'), findsOneWidget);
+      expect(find.text('Evento 99 nao esta na sua agenda'), findsOneWidget);
+      expect(find.text('Tentar de novo'), findsOneWidget);
+    },
+  );
+
+  testWidgets('sem o evento na rota (o F5 no detalhe), a tela mostra a lista', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
-    pedidos = 0;
 
-    await tester.tap(find.text('Feira de Tecnologia'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(EventoScreen), findsOneWidget);
-    expect(find.text('2026-11-20'), findsOneWidget);
-    expect(find.text('Centro de Convenções'), findsOneWidget);
-    expect(pedidos, 1);
-  });
-
-  testWidgets('o detalhe de um evento que não existe mais mostra o erro da API', (tester) async {
-    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
-
-    Navigator.of(tester.element(find.byType(EventosScreen))).pushNamed(AppRoutes.evento, arguments: 99);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Não consegui carregar o evento'), findsOneWidget);
-    expect(find.text('Evento 99 nao esta na sua agenda'), findsOneWidget);
-    expect(find.text('Tentar de novo'), findsOneWidget);
-  });
-
-  testWidgets('sem o evento na rota (o F5 no detalhe), a tela mostra a lista', (tester) async {
-    await abrirOsEventos(tester, apiDeEventos(200, doisEventos));
-
-    Navigator.of(tester.element(find.byType(EventosScreen))).pushNamed(AppRoutes.evento);
+    Navigator.of(tester.element(find.byType(EventosScreen)))
+        .pushNamed(AppRoutes.evento);
     await tester.pumpAndSettle();
 
     expect(find.byType(EventoScreen), findsOneWidget);
@@ -512,106 +639,149 @@ void main() {
   });
 
   // O formulário: criar, a validação nas duas pontas, editar e excluir.
-  testWidgets('o + abre o formulário vazio, e salvar põe o evento novo na lista', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
+  testWidgets(
+    'o + abre o formulário vazio, e salvar põe o evento novo na lista',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira());
 
-    await preencherOFormulario(tester, 'Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11');
-    expect(find.text('Novo evento'), findsOneWidget);
-    await tester.tap(find.text('Salvar'));
-    await tester.pumpAndSettle();
+      await preencherOFormulario(
+        tester,
+        'Encontro Cultural',
+        'Centro Cultural',
+        '2090-12-10',
+        '2090-12-11',
+      );
+      expect(find.text('Novo evento'), findsOneWidget);
+      await tester.tap(find.text('Salvar'));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(FormularioScreen), findsNothing);
-    expect(find.byType(ListTile), findsNWidgets(3));
-    expect(find.text('Encontro Cultural'), findsOneWidget);
-  });
+      expect(find.byType(FormularioScreen), findsNothing);
+      expect(find.byType(ListTile), findsNWidgets(3));
+      expect(find.text('Encontro Cultural'), findsOneWidget);
+    },
+  );
 
-  testWidgets('o validator segura o formulário: com campo errado, nada vai para a API', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await preencherOFormulario(tester, '', '', '', '');
-    pedidos = 0;
+  testWidgets(
+    'o validator segura o formulário: com campo errado, nada vai para a API',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira());
+      await preencherOFormulario(tester, '', '', '', '');
+      pedidos = 0;
 
-    await tester.tap(find.text('Salvar'));
-    await tester.pump();
-    expect(find.text('Informe o nome'), findsOneWidget);
-    expect(find.text('Informe a data de início'), findsOneWidget);
-    expect(find.text('Informe a data de fim'), findsOneWidget);
+      await tester.tap(find.text('Salvar'));
+      await tester.pump();
+      expect(find.text('Informe o nome'), findsOneWidget);
+      expect(find.text('Informe a data de início'), findsOneWidget);
+      expect(find.text('Informe a data de fim'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Encontro Cultural');
-    await tester.enterText(find.byType(TextFormField).at(1), 'Centro Cultural');
-    await tester.enterText(find.byType(TextFormField).at(2), '');
-    await tester.tap(find.text('Salvar'));
-    await tester.pump();
-    expect(find.text('Informe o nome'), findsNothing);
-    expect(find.text('Informe a data de início'), findsOneWidget);
-    expect(pedidos, 0);
-    expect(find.byType(FormularioScreen), findsOneWidget);
-  });
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'Encontro Cultural',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(1),
+        'Centro Cultural',
+      );
+      await tester.enterText(find.byType(TextFormField).at(2), '');
+      await tester.tap(find.text('Salvar'));
+      await tester.pump();
+      expect(find.text('Informe o nome'), findsNothing);
+      expect(find.text('Informe a data de início'), findsOneWidget);
+      expect(pedidos, 0);
+      expect(find.byType(FormularioScreen), findsOneWidget);
+    },
+  );
 
-  testWidgets('nome repetido: a API recusa (409), e o formulário mostra a frase e fica aberto', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
+  testWidgets(
+    'token vencido: a API recusa e o formulário mostra a frase e fica aberto',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira(recusarGravacao: true));
 
-    await preencherOFormulario(tester, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11');
-    await tester.tap(find.text('Salvar'));
-    await tester.pumpAndSettle();
+      await preencherOFormulario(
+        tester,
+        'Festival de Música',
+        'Praça Central',
+        '2090-11-10',
+        '2090-11-11',
+      );
+      await tester.tap(find.text('Salvar'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Ja existe um evento chamado Festival de Música'), findsOneWidget);
-    expect(find.byType(FormularioScreen), findsOneWidget);
-  });
+      expect(find.text('Token invalido ou vencido'), findsOneWidget);
+      expect(find.byType(FormularioScreen), findsOneWidget);
+    },
+  );
 
-  testWidgets('editar: o formulário vem preenchido, e salvar volta para a lista, já atualizada', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await tester.tap(find.text('Festival de Música'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'editar: o formulário vem preenchido, e salvar volta para a lista, já atualizada',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira());
+      await tester.tap(find.text('Festival de Música'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Editar'));
-    await tester.pumpAndSettle();
-    expect(find.text('Editar evento'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Festival de Música'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, '2026-11-10'), findsOneWidget);
+      await tester.tap(find.text('Editar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Editar evento'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, 'Festival de Música'),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(TextFormField, '2090-11-10'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField).at(1), 'Teatro Municipal');
-    await tester.tap(find.text('Salvar'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).at(1),
+        'Teatro Municipal',
+      );
+      await tester.tap(find.text('Salvar'));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(FormularioScreen), findsNothing);
-    expect(find.byType(EventoScreen), findsNothing);
-    expect(find.text('Teatro Municipal'), findsOneWidget);
-    expect(find.text('Praça Central'), findsNothing);
-  });
+      expect(find.byType(FormularioScreen), findsNothing);
+      expect(find.byType(EventoScreen), findsNothing);
+      expect(find.text('Teatro Municipal'), findsOneWidget);
+      expect(find.text('Praça Central'), findsNothing);
+    },
+  );
 
-  testWidgets('excluir pergunta antes: Cancelar deixa o evento; Excluir o tira da lista', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await tester.tap(find.text('Festival de Música'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'excluir pergunta antes: Cancelar deixa o evento; Excluir o tira da lista',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira());
+      await tester.tap(find.text('Festival de Música'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Excluir'));
-    await tester.pumpAndSettle();
-    expect(find.text('Excluir Festival de Música?'), findsOneWidget);
-    await tester.tap(find.text('Cancelar'));
-    await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
-    expect(find.byType(EventoScreen), findsOneWidget);
+      await tester.tap(find.text('Excluir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Excluir Festival de Música?'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(EventoScreen), findsOneWidget);
 
-    await excluirRespondendo(tester, 'Excluir');
+      await excluirRespondendo(tester, 'Excluir');
 
-    expect(find.byType(EventoScreen), findsNothing);
-    expect(find.text('Festival de Música'), findsNothing);
-    expect(find.byType(ListTile), findsOneWidget);
-  });
+      expect(find.byType(EventoScreen), findsNothing);
+      expect(find.text('Festival de Música'), findsNothing);
+      expect(find.byType(ListTile), findsOneWidget);
+    },
+  );
 
-  testWidgets('a API não deixa excluir o evento encerrado (409): o detalhe mostra a frase', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
+  testWidgets('evento removido em outra aba (404): o detalhe mostra a frase', (
+    tester,
+  ) async {
+    await abrirOsEventos(tester, agendaDeMentira(eventoRemovido: true));
     await tester.tap(find.text('Feira de Tecnologia'));
     await tester.pumpAndSettle();
 
     await excluirRespondendo(tester, 'Excluir');
 
-    expect(find.text('Evento 2 esta encerrado'), findsOneWidget);
+    expect(find.text('Evento 2 nao esta no seu calendario'), findsOneWidget);
     expect(find.byType(EventoScreen), findsOneWidget);
   });
 
   // A busca e os avisos, preservados do projeto da biblioteca.
-  testWidgets('a busca pede à API só os eventos com o texto no nome', (tester) async {
+  testWidgets('a busca pede à API só os eventos com o texto no nome', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, agendaDeMentira());
     await buscar(tester, 'festival');
     expect(ultimoEndereco!.queryParameters['nome'], 'festival');
@@ -627,7 +797,9 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
   });
 
-  testWidgets('a busca vazia volta à lista inteira, sem parâmetro', (tester) async {
+  testWidgets('a busca vazia volta à lista inteira, sem parâmetro', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, agendaDeMentira());
     await buscar(tester, 'festival');
     await buscar(tester, '');
@@ -635,10 +807,18 @@ void main() {
     expect(find.byType(ListTile), findsNWidgets(2));
   });
 
-  testWidgets('depois de salvar, a lista pede de novo com a mesma busca', (tester) async {
+  testWidgets('depois de salvar, a lista pede de novo com a mesma busca', (
+    tester,
+  ) async {
     await abrirOsEventos(tester, agendaDeMentira());
     await buscar(tester, 'festival');
-    await preencherOFormulario(tester, 'Festival Gastronômico', 'Parque', '2026-12-10', '2026-12-11');
+    await preencherOFormulario(
+      tester,
+      'Festival Gastronômico',
+      'Parque',
+      '2090-12-10',
+      '2090-12-11',
+    );
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(find.byType(ListTile), findsNWidgets(2));
@@ -647,25 +827,42 @@ void main() {
 
   testWidgets('salvar mostra o aviso: Evento salvo', (tester) async {
     await abrirOsEventos(tester, agendaDeMentira());
-    await preencherOFormulario(tester, 'Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11');
+    await preencherOFormulario(
+      tester,
+      'Encontro Cultural',
+      'Centro Cultural',
+      '2090-12-10',
+      '2090-12-11',
+    );
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(find.byType(FormularioScreen), findsNothing);
     expect(find.widgetWithText(SnackBar, 'Evento salvo'), findsOneWidget);
   });
 
-  testWidgets('recusa da API mostra aviso e mantém a frase no formulário', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-    await preencherOFormulario(tester, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11');
+  testWidgets('recusa da API mostra aviso e mantém a frase no formulário', (
+    tester,
+  ) async {
+    await abrirOsEventos(tester, agendaDeMentira(recusarGravacao: true));
+    await preencherOFormulario(
+      tester,
+      'Festival de Música',
+      'Praça Central',
+      '2090-11-10',
+      '2090-11-11',
+    );
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(SnackBar, 'Não deu para salvar'), findsOneWidget);
-    expect(find.text('Ja existe um evento chamado Festival de Música'), findsOneWidget);
+    expect(
+      find.widgetWithText(SnackBar, 'Não deu para salvar'),
+      findsOneWidget,
+    );
+    expect(find.text('Token invalido ou vencido'), findsOneWidget);
     expect(find.byType(FormularioScreen), findsOneWidget);
   });
 
   testWidgets('excluir mostra aviso de sucesso ou falha', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
+    await abrirOsEventos(tester, agendaDeMentira(eventoRemovido: true));
     await tester.tap(find.text('Festival de Música'));
     await tester.pumpAndSettle();
     await excluirRespondendo(tester, 'Excluir');
@@ -674,23 +871,27 @@ void main() {
     await tester.tap(find.text('Feira de Tecnologia'));
     await tester.pumpAndSettle();
     await excluirRespondendo(tester, 'Excluir');
-    expect(find.widgetWithText(SnackBar, 'Não deu para excluir'), findsOneWidget);
-    expect(find.text('Evento 2 esta encerrado'), findsOneWidget);
-  });
-
-  testWidgets('depois de um F5 no formulário (a primeira tela da pilha), ele mostra a lista', (tester) async {
-    await abrirOsEventos(tester, agendaDeMentira());
-
-    Navigator.of(tester.element(find.byType(EventosScreen))).pushNamedAndRemoveUntil(
-      AppRoutes.formulario,
-      (rota) => false,
+    expect(
+      find.widgetWithText(SnackBar, 'Não deu para excluir'),
+      findsOneWidget,
     );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(FormularioScreen), findsOneWidget);
-    expect(find.text('Novo evento'), findsNothing);
-    expect(find.text('Festival de Música'), findsOneWidget);
+    expect(find.text('Evento 2 nao esta no seu calendario'), findsOneWidget);
   });
+
+  testWidgets(
+    'depois de um F5 no formulário (a primeira tela da pilha), ele mostra a lista',
+    (tester) async {
+      await abrirOsEventos(tester, agendaDeMentira());
+
+      Navigator.of(tester.element(find.byType(EventosScreen)))
+          .pushNamedAndRemoveUntil(AppRoutes.formulario, (rota) => false);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FormularioScreen), findsOneWidget);
+      expect(find.text('Novo evento'), findsNothing);
+      expect(find.text('Festival de Música'), findsOneWidget);
+    },
+  );
 
   // O service testado sozinho, sem tela nenhuma: é o que as camadas compram.
   test('o service recusa campos vazios sem nem chamar a API', () async {
@@ -698,7 +899,10 @@ void main() {
     pedidos = 0;
 
     await expectLater(sessao.entrar('', ''), throwsA(isA<ErroDeLogin>()));
-    await expectLater(sessao.cadastrar('', '', ''), recusadoCom('Preencha o nome, o e-mail e a senha'));
+    await expectLater(
+      sessao.cadastrar('', '', ''),
+      recusadoCom('Preencha o nome, o e-mail e a senha'),
+    );
     expect(pedidos, 0);
     expect(sessao.logado, isFalse);
   });
@@ -719,15 +923,18 @@ void main() {
     expect(avisos, 2);
   });
 
-  test('cadastrar cria a conta e já entra com ela, pelo mesmo caminho do login', () async {
-    final sessao = sessaoDeMentira();
+  test(
+    'cadastrar cria a conta e já entra com ela, pelo mesmo caminho do login',
+    () async {
+      final sessao = sessaoDeMentira();
 
-    await sessao.cadastrar('Bia', 'bia@eventos.com', 'segredo456');
+      await sessao.cadastrar('Bia', 'bia@eventos.com', 'segredo456');
 
-    expect(sessao.logado, isTrue);
-    expect(sessao.usuario?.nome, 'Bia');
-    expect(sessao.token, 'token-de-bia@eventos.com');
-  });
+      expect(sessao.logado, isTrue);
+      expect(sessao.usuario?.nome, 'Bia');
+      expect(sessao.token, 'token-de-bia@eventos.com');
+    },
+  );
 
   test('o service traduz a recusa da API: e-mail repetido (409) e campo inválido (422)', () async {
     final sessao = sessaoDeMentira();
@@ -753,7 +960,9 @@ void main() {
   });
 
   test('restaurar devolve a sessão a quem tem um token guardado', () async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+    final sessao = sessaoDeMentira(
+      guardado: {'token': 'token-de-ana@eventos.com'},
+    );
     pedidos = 0;
 
     await sessao.restaurar();
@@ -783,7 +992,9 @@ void main() {
   });
 
   test('sair apaga o token guardado no aparelho', () async {
-    final sessao = sessaoDeMentira(guardado: {'token': 'token-de-ana@eventos.com'});
+    final sessao = sessaoDeMentira(
+      guardado: {'token': 'token-de-ana@eventos.com'},
+    );
     await sessao.restaurar();
     expect(sessao.logado, isTrue);
 
@@ -792,74 +1003,108 @@ void main() {
     expect(await tokenGuardado(), isNull);
   });
 
-  test('o repositório manda o token no cabeçalho e devolve objetos Evento', () async {
-    String? cabecalho;
-    final cliente = MockClient((pedido) async {
-      cabecalho = pedido.headers['Authorization'];
-      return http.Response(jsonEncode(doisEventos), 200);
-    });
+  test(
+    'o repositório manda o token no cabeçalho e devolve objetos Evento',
+    () async {
+      String? cabecalho;
+      final cliente = MockClient((pedido) async {
+        cabecalho = pedido.headers['Authorization'];
+        return http.Response(jsonEncode(doisEventos), 200);
+      });
 
-    final eventos = await EventoRepository(cliente: cliente).listar('tk-123');
+      final eventos = await EventoRepository(cliente: cliente).listar('tk-123');
 
-    expect(cabecalho, 'Bearer tk-123');
-    expect(eventos, hasLength(2));
-    expect(eventos.first, isA<Evento>());
-    expect(eventos.first.nome, 'Festival de Música');
-  });
+      expect(cabecalho, 'Bearer tk-123');
+      expect(eventos, hasLength(2));
+      expect(eventos.first, isA<Evento>());
+      expect(eventos.first.nome, 'Festival de Música');
+    },
+  );
 
-  test('o repositório busca um evento só pelo id, com o token: GET /eventos/2', () async {
-    String? caminho;
-    String? cabecalho;
-    final cliente = MockClient((pedido) async {
-      caminho = pedido.url.path;
-      cabecalho = pedido.headers['Authorization'];
-      return http.Response(jsonEncode(doisEventos.last), 200);
-    });
+  test(
+    'o repositório busca um evento só pelo id, com o token: GET /eventos/2',
+    () async {
+      String? caminho;
+      String? cabecalho;
+      final cliente = MockClient((pedido) async {
+        caminho = pedido.url.path;
+        cabecalho = pedido.headers['Authorization'];
+        return http.Response(jsonEncode(doisEventos.last), 200);
+      });
 
-    final evento = await EventoRepository(cliente: cliente).buscar('tk-123', 2);
+      final evento = await EventoRepository(cliente: cliente)
+          .buscar('tk-123', 2);
 
-    expect(caminho, '/eventos/2');
-    expect(cabecalho, 'Bearer tk-123');
-    expect(evento.nome, 'Feira de Tecnologia');
-  });
+      expect(caminho, '/eventos/2');
+      expect(cabecalho, 'Bearer tk-123');
+      expect(evento.nome, 'Feira de Tecnologia');
+    },
+  );
 
   test('o repositório cria com POST: o evento em JSON no corpo, e o token no cabeçalho', () async {
     late http.Request enviado;
     final cliente = MockClient((pedido) async {
       enviado = pedido;
       return http.Response(
-        jsonEncode({'id': 3, 'nome': 'Encontro Cultural', 'local': 'Centro Cultural', 'data_inicio': '2026-12-10', 'data_fim': '2026-12-11'}),
+        jsonEncode({
+          'id': 3,
+          'nome': 'Encontro Cultural',
+          'local': 'Centro Cultural',
+          'data_inicio': '2090-12-10',
+          'data_fim': '2090-12-11',
+        }),
 
         201,
       );
     });
 
-    final evento = await EventoRepository(cliente: cliente).criar('tk-123','Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11',);
+    final evento = await EventoRepository(cliente: cliente).criar(
+      'tk-123',
+      'Encontro Cultural',
+      'Centro Cultural',
+      '2090-12-10',
+      '2090-12-11',
+    );
 
     expect(enviado.method, 'POST');
     expect(enviado.url.path, '/eventos/');
     expect(enviado.headers['Authorization'], 'Bearer tk-123');
     expect(enviado.headers['Content-Type'], startsWith('application/json'));
-    expect(jsonDecode(enviado.body), {'nome': 'Encontro Cultural', 'local': 'Centro Cultural', 'data_inicio': '2026-12-10', 'data_fim': '2026-12-11'});
+    expect(jsonDecode(enviado.body), {
+      'nome': 'Encontro Cultural',
+      'local': 'Centro Cultural',
+      'data_inicio': '2090-12-10',
+      'data_fim': '2090-12-11',
+    });
     expect(evento.id, 3);
   });
 
-  test('o repositório edita com PATCH e exclui com DELETE, no endereço do evento', () async {
-    final feitos = <String>[];
-    final cliente = MockClient((pedido) async {
-      feitos.add('${pedido.method} ${pedido.url.path}');
-      if (pedido.method == 'DELETE') {
-        return http.Response('', 204);
-      }
-      return http.Response(jsonEncode(doisEventos.first), 200);
-    });
-    final repositorio = EventoRepository(cliente: cliente);
+  test(
+    'o repositório edita com PATCH e exclui com DELETE, no endereço do evento',
+    () async {
+      final feitos = <String>[];
+      final cliente = MockClient((pedido) async {
+        feitos.add('${pedido.method} ${pedido.url.path}');
+        if (pedido.method == 'DELETE') {
+          return http.Response('', 204);
+        }
+        return http.Response(jsonEncode(doisEventos.first), 200);
+      });
+      final repositorio = EventoRepository(cliente: cliente);
 
-    await repositorio.atualizar('tk-123', 1, 'Festival de Música', 'Praça Central', '2026-11-10', '2026-11-11',);
-    await repositorio.excluir('tk-123', 1);
+      await repositorio.atualizar(
+        'tk-123',
+        1,
+        'Festival de Música',
+        'Praça Central',
+        '2090-11-10',
+        '2090-11-11',
+      );
+      await repositorio.excluir('tk-123', 1);
 
-    expect(feitos, ['PATCH /eventos/1', 'DELETE /eventos/1']);
-  });
+      expect(feitos, ['PATCH /eventos/1', 'DELETE /eventos/1']);
+    },
+  );
 
   test('o 422 da API vira a frase da tela: o campo e a mensagem, sem o Value error', () async {
     final sessao = sessaoDeMentira();
@@ -881,20 +1126,40 @@ void main() {
     final servico = EventoService(EventoRepository(cliente: recusa), sessao);
 
     await expectLater(
-      servico.criar('Encontro Cultural', 'Centro Cultural', '2026-12-10', '2026-12-11',),
-      throwsA(isA<ErroDeEventos>().having((e) => '$e', 'texto', 'data_inicio: a data precisa ser válida')),
+      servico.criar(
+        'Encontro Cultural',
+        'Centro Cultural',
+        '2090-12-10',
+        '2090-12-11',
+      ),
+      throwsA(
+        isA<ErroDeEventos>().having(
+          (e) => '$e',
+          'texto',
+          'data_inicio: a data precisa ser válida',
+        ),
+      ),
     );
   });
 
-  test('o service dos eventos traduz a recusa: a frase da API vai para a tela', () async {
-    final sessao = sessaoDeMentira();
-    await sessao.entrar('ana@eventos.com', 'segredo123');
-    final recusa = apiDeEventos(401, {'detail': 'Token invalido ou vencido'});
-    final servico = EventoService(EventoRepository(cliente: recusa), sessao);
+  test(
+    'o service dos eventos traduz a recusa: a frase da API vai para a tela',
+    () async {
+      final sessao = sessaoDeMentira();
+      await sessao.entrar('ana@eventos.com', 'segredo123');
+      final recusa = apiDeEventos(401, {'detail': 'Token invalido ou vencido'});
+      final servico = EventoService(EventoRepository(cliente: recusa), sessao);
 
-    await expectLater(
-      servico.listar(),
-      throwsA(isA<ErroDeEventos>().having((e) => '$e', 'texto', 'Token invalido ou vencido')),
-    );
-  });
+      await expectLater(
+        servico.listar(),
+        throwsA(
+          isA<ErroDeEventos>().having(
+            (e) => '$e',
+            'texto',
+            'Token invalido ou vencido',
+          ),
+        ),
+      );
+    },
+  );
 }

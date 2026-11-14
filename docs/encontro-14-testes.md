@@ -5,23 +5,26 @@ O modelo de biblioteca foi adaptado para `Evento`, com `nome`, `local`,
 
 ## API: verde, vermelho e verde
 
-1. Em `backend/`, rode `poetry run pytest`: os nove testes devem passar.
+1. Em `backend/`, rode `poetry run pytest`: a suíte deve passar. Os nove
+   testes originais continuam em `tests/test_eventos.py`; a revisão da
+   rubrica acrescentou os casos de validação em `tests/test_validacao.py`.
 2. Em `backend/app/eventos/repository.py`, na função `listar`, troque
    temporariamente `consulta = db.query(Evento).filter(Evento.dono_id == dono_id)`
    por `consulta = db.query(Evento)`.
 3. Rode `poetry run pytest` novamente. O teste
    `test_o_bruno_nao_ve_o_evento_da_ana` deve falhar: a lista do Bruno recebe
-   o evento da Ana. Os outros oito devem continuar passando.
-4. Restaure o filtro do dono e rode novamente: os nove devem passar.
+   o evento da Ana. Os demais devem continuar passando.
+4. Restaure o filtro do dono e rode novamente: a suíte deve passar.
 
 ## Formulário: verde, vermelho e verde
 
 1. Em `frontend/`, rode `flutter test test/formulario_test.dart`:
-   os dois testes devem passar.
+   todos os testes do arquivo devem passar.
 2. Em `frontend/lib/screens/formulario_screen.dart`, no validator do nome,
-   troque temporariamente `return 'Informe o nome';` por `return null;`.
-3. Rode o mesmo comando: o primeiro teste deve falhar porque a mensagem
-   não aparece. O segundo deve continuar passando.
+   troque temporariamente `return validarTextoEvento(valor, 'nome', 120);`
+   por `return null;`.
+3. Rode o mesmo comando: o teste do formulário vazio deve falhar porque a
+   mensagem não aparece. Os testes com nome preenchido devem continuar passando.
 4. Restaure a mensagem e rode `flutter test` para conferir todos os testes.
 
 Não entregue o código com as falhas temporárias.
@@ -31,7 +34,7 @@ Não entregue o código com as falhas temporárias.
 - `backend/conftest.py`: banco e chave exclusivos dos testes.
 - `backend/tests/test_eventos.py`: nove testes de endpoint.
 - `backend/pyproject.toml`: pytest e httpx no grupo de desenvolvimento.
-- `frontend/test/formulario_test.dart`: dois testes de validação.
+- `frontend/test/formulario_test.dart`: testes de validação do formulário.
 - `frontend/test/lista_test.dart`: dois testes com API de mentira.
 - `frontend/test/screens_test.dart`: suíte anterior preservada.
 - `README.md`: comandos para executar os testes.

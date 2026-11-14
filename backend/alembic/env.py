@@ -9,7 +9,7 @@ from alembic import context
 # AS TABELAS DO PROJETO. Importar os models e' o que os registra na Base:
 # sem estas linhas o autogenerate acha que o projeto nao tem tabela nenhuma
 # -- e gera uma migracao que apaga tudo.
-from app.database import Base
+from app.database import Base, URL
 import app.eventos.models      # noqa: F401
 import app.usuarios.models    # noqa: F401
 
@@ -18,7 +18,7 @@ config = context.config
 # A URL vem do .env, o mesmo que a aplicacao usa. (O `%` dobrado e' porque o
 # arquivo .ini trata `%` como caractere especial.)
 load_dotenv()
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"].replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", URL.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

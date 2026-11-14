@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../routes.dart';
 import '../services/sessao_service.dart';
+import 'aviso.dart';
 
 // O menu lateral, igual em toda tela protegida. Ele não recebe nada pelo
 // construtor: pergunta à sessão quem está logado, onde quer que esteja.
@@ -23,27 +24,50 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.home),
             title: const Text('Início'),
-            onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.inicio),
+            onTap: () =>
+                Navigator.pushReplacementNamed(context, AppRoutes.inicio),
           ),
           ListTile(
             leading: const Icon(Icons.event),
             title: const Text('Eventos'),
-            onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.eventos),
+            onTap: () =>
+                Navigator.pushReplacementNamed(context, AppRoutes.eventos),
           ),
           ListTile(
             leading: const Icon(Icons.person),
             title: const Text('Perfil'),
-            onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.perfil),
+            onTap: () =>
+                Navigator.pushReplacementNamed(context, AppRoutes.perfil),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
             onTap: () async {
-              await context.read<SessaoService>().sair();
+              final sessao = context.read<SessaoService>();
+              final navegador = Navigator.of(context);
+              final mensageiro = ScaffoldMessenger.of(context);
+              try {
+                await sessao.sair();
+              } catch (_) {
+                if (context.mounted) {
+                  avisar(
+                    context,
+                    'Não consegui sair. Tente de novo.',
+                    erro: true,
+                  );
+                }
+                return;
+              }
+              mensageiro.hideCurrentSnackBar();
+              mensageiro.showSnackBar(
+                const SnackBar(
+                  content: Text('Você saiu da conta'),
+                  backgroundColor: Colors.green,
+                ),
+              );
               if (!context.mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
+              navegador.pushNamedAndRemoveUntil(
                 AppRoutes.login,
                 (rota) => false,
               );

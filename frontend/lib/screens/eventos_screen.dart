@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +5,7 @@ import '../models/evento.dart';
 import '../routes.dart';
 import '../services/evento_service.dart';
 import '../widgets/app_drawer.dart';
+import '../widgets/aviso.dart';
 
 // A lista dos eventos de quem está logado, vinda da API. A tela tem quatro
 // estados, um de cada vez: carregando, erro, lista vazia e a lista. No alto, o
@@ -42,9 +42,15 @@ class _EventosScreenState extends State<EventosScreen> {
 
   // O Enter no campo de busca: guarda o texto e pede de novo. Quem filtra é a
   // API (o parâmetro de busca), e não a tela.
-  void buscar(String texto) {
+  Future<void> buscar(String texto) async {
     busca = texto.trim();
     pedirDeNovo();
+    try {
+      await eventos;
+      if (mounted) avisar(context, 'Busca concluída');
+    } catch (_) {
+      if (mounted) avisar(context, 'Não deu para buscar', erro: true);
+    }
   }
 
   // Os quatro estados da lista, como antes; vazia, a frase diz o que foi buscado.

@@ -5,7 +5,10 @@ import 'package:http/http.dart' as http;
 import '../models/usuario.dart';
 
 // Onde a API roda: o uvicorn, na porta de sempre.
-const enderecoDaApi = 'http://127.0.0.1:8000';
+const enderecoDaApi = String.fromEnvironment(
+  'API_URL',
+  defaultValue: 'http://127.0.0.1:8000',
+);
 
 // A API disse não: o código HTTP e a frase que ela mandou, já em texto simples.
 // É a língua do repositório; quem decide o que a tela mostra é o service.
@@ -19,7 +22,8 @@ class RecusaDaApi implements Exception {
 // A camada de dados: o único lugar do app que sabe endereço, HTTP e JSON.
 // No backend, o repository fala com o banco; aqui, ele fala com a API.
 class UsuarioRepository {
-  UsuarioRepository({http.Client? cliente}) : cliente = cliente ?? http.Client();
+  UsuarioRepository({http.Client? cliente})
+    : cliente = cliente ?? http.Client();
 
   final http.Client cliente;
 

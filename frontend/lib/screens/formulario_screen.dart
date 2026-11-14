@@ -1,9 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/evento.dart';
 import '../services/evento_service.dart';
+import '../services/validacao_evento.dart';
 import '../widgets/aviso.dart';
 import 'eventos_screen.dart';
 
@@ -48,6 +48,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
     // A ponta do app: cada validator confere o seu campo. Se algum devolver
     // uma frase, ela aparece embaixo do campo, e nada vai para a API.
     if (!chave.currentState!.validate()) {
+      avisar(context, 'Confira os campos do evento', erro: true);
       return;
     }
 
@@ -136,10 +137,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (valor) {
-                      if ((valor ?? '').trim().isEmpty) {
-                        return 'Informe o nome';
-                      }
-                      return null;
+                      return validarTextoEvento(valor, 'nome', 120);
                     },
                   ),
                   const SizedBox(height: 16),
@@ -150,10 +148,7 @@ class _FormularioScreenState extends State<FormularioScreen> {
                       border: OutlineInputBorder(),
                     ),
                     validator: (valor) {
-                      if ((valor ?? '').trim().isEmpty) {
-                        return 'Informe o local';
-                      }
-                      return null;
+                      return validarTextoEvento(valor, 'local', 50);
                     },
                   ),
                   const SizedBox(height: 16),
@@ -161,12 +156,17 @@ class _FormularioScreenState extends State<FormularioScreen> {
                     controller: dataInicio,
                     decoration: const InputDecoration(
                       labelText: 'Data de início',
+                      helperText: 'DD/MM/AAAA HH:MM (horário de Brasília)',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.datetime,
                     validator: (valor) {
-                      if ((valor ?? '').trim().isEmpty) {
-                        return 'Informe a data de início';
+                      final mensagem = validarDataEvento(valor, 'início');
+                      if (mensagem != null) return mensagem;
+                      if (widget.evento == null &&
+                          lerDataEvento(valor!)!
+                              .isBefore(DateTime.now().toUtc())) {
+                        return 'O evento não pode começar no passado';
                       }
                       return null;
                     },
@@ -176,12 +176,17 @@ class _FormularioScreenState extends State<FormularioScreen> {
                     controller: dataFim,
                     decoration: const InputDecoration(
                       labelText: 'Data de fim',
+                      helperText: 'DD/MM/AAAA HH:MM (depois do início)',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.datetime,
                     validator: (valor) {
-                      if ((valor ?? '').trim().isEmpty) {
-                        return 'Informe a data de fim';
+                      final mensagem = validarDataEvento(valor, 'fim');
+                      if (mensagem != null) return mensagem;
+                      final inicio = lerDataEvento(dataInicio.text);
+                      if (inicio != null &&
+                          !lerDataEvento(valor!)!.isAfter(inicio)) {
+                        return 'O fim precisa ser depois do início';
                       }
                       return null;
                     },
