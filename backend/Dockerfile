@@ -1,7 +1,9 @@
 # O projeto exige Python 3.14; a base 3.12 do exemplo não atende ao pyproject.
 FROM python:3.14-slim AS dependencias
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev \
+# build-essential inclui o compilador e os headers C (como assert.h),
+# necessários para compilar psycopg2 na imagem slim.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN python -m pip install --no-cache-dir poetry==2.5.1 \
     && python -m venv /opt/venv
