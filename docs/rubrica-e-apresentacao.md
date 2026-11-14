@@ -24,8 +24,8 @@
 - [ ] Endereços reais preenchidos no README, sem credenciais.
 - [ ] Demonstração ensaiada e explicação das camadas preparada.
 
-O projeto inclui Dockerfile e Compose, mas esses arquivos não significam que
-a hospedagem já foi feita. O banco usa URL privada; não exponha suas credenciais.
+O Dockerfile define a construção da API na hospedagem. O banco usa URL privada;
+suas credenciais ficam nas variáveis de ambiente.
 
 ## Roteiro de demonstração
 
@@ -73,7 +73,7 @@ HTTP; os testes de endpoint executam a API real com um banco exclusivo.
   revertidas até a base com sucesso.
 - CORS conferido: a origem pública configurada é aceita; outra origem é
   recusada pelo navegador por não receber permissão de acesso.
-- Dockerfile e Compose preparados. Docker não está instalado neste ambiente;
+- Dockerfile preparado. Docker não está instalado neste ambiente;
   o build do container e a execução com PostgreSQL ainda precisam ser
   confirmados na máquina/hospedagem que fará a publicação.
 - Publicação real e demonstração permanecem pendentes.

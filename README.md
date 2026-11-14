@@ -60,7 +60,6 @@ frontend/
 +-- test/
 docs/
 prototipo/
-compose.yaml
 ```
 
 Na API, o fluxo segue Controller → Service → Repository. Os controllers
@@ -179,26 +178,6 @@ dart analyze
 Os testes de widget utilizam respostas HTTP simuladas e verificam os fluxos
 de autenticação, sessão, CRUD, busca, validação e feedback. A execução dos
 testes não exige API ativa nem navegador aberto.
-
-## Docker e PostgreSQL
-
-O arquivo `compose.yaml` inicia a API e um banco PostgreSQL com volume
-persistente. A configuração utiliza o `.env` da raiz:
-
-```powershell
-Copy-Item .env.exemplo .env
-```
-
-`POSTGRES_PASSWORD` e `SECRET_KEY` devem receber valores distintos e
-aleatórios. Uma senha hexadecimal evita caracteres especiais na URL do banco.
-`ENDERECO_DO_APP` define a origem pública permitida.
-
-```powershell
-docker compose up --build -d
-docker compose logs -f api
-```
-
-O encerramento com preservação do volume é feito com `docker compose down`.
 
 ## Configuração de publicação
 
