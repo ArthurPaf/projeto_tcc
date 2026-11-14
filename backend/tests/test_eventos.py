@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 
-# Datas relativas mantêm o teste válido depois da apresentação do trabalho.
+# Datas relativas mantêm os eventos de teste no futuro.
 INICIO = datetime.now().replace(microsecond=0) + timedelta(days=30)
 EVENTO = {
     "nome": "Festival de Música",
@@ -77,7 +77,7 @@ def test_evento_que_nao_existe_devolve_404(cliente):
 
 
 def test_evento_que_termina_antes_de_comecar_devolve_409(cliente):
-    # No lugar do título repetido da biblioteca: RN02 do projeto de eventos.
+    # RN02: o fim do evento deve ser posterior ao início.
     ana = entrar(cliente, "ana@ifg.edu.br")
     dados = {**EVENTO, "data_fim": (INICIO - timedelta(hours=1)).isoformat()}
     resposta = cliente.post("/eventos/", json=dados, headers=ana)

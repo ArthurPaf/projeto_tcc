@@ -1,4 +1,4 @@
-# O projeto exige Python 3.14; a base 3.12 do exemplo não atende ao pyproject.
+# Versão do Python definida no pyproject.toml.
 FROM python:3.14-slim AS dependencias
 WORKDIR /app
 # build-essential inclui o compilador e os headers C (como assert.h),

@@ -12,7 +12,7 @@ def test_postgres_usa_driver_instalado_e_preserva_parametros(prefixo):
     destino = "teste:senha%40teste@banco.invalid:5432/eventos?sslmode=require"
     url = normalizar_url(prefixo + destino)
     assert url == "postgresql+psycopg2://" + destino
-    # create_engine importa o driver sem tentar conectar. Antes, falhava aqui.
+    # create_engine importa o driver sem abrir conexão com o servidor.
     engine = create_engine(url)
     try:
         assert engine.dialect.driver == "psycopg2"

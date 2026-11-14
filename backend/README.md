@@ -21,10 +21,24 @@ Requisitos: Python 3.14 ou superior e Poetry. Comandos nesta pasta:
 
 ```powershell
 poetry install
-Copy-Item .env.exemplo .env
 ```
 
-Após configurar `DATABASE_URL` e `SECRET_KEY` no `.env`:
+A configuração local utiliza um arquivo `.env` nesta pasta:
+
+```env
+DATABASE_URL=sqlite:///./eventos.db
+SECRET_KEY=
+ENDERECO_DO_APP=
+CORS_ORIGINS=
+```
+
+`SECRET_KEY` deve conter uma chave aleatória. O comando abaixo gera um valor:
+
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Após preencher a configuração:
 
 ```powershell
 poetry run alembic upgrade head

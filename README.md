@@ -45,7 +45,6 @@ backend/
 |-- conftest.py
 |-- Dockerfile
 |-- .dockerignore
-|-- .env.exemplo
 |-- pyproject.toml
 +-- poetry.lock
 frontend/
@@ -80,11 +79,18 @@ Requisitos: Python 3.14 ou superior, Poetry e Flutter compatível com Dart
 ```powershell
 cd backend
 poetry install
-Copy-Item .env.exemplo .env
 ```
 
-Em Linux/macOS, o comando de cópia é `cp .env.exemplo .env`.
-O arquivo `backend/.env` contém a configuração local:
+O arquivo `backend/.env`, criado localmente, deve conter a configuração:
+
+```env
+DATABASE_URL=sqlite:///./eventos.db
+SECRET_KEY=
+ENDERECO_DO_APP=
+CORS_ORIGINS=
+```
+
+`SECRET_KEY` deve ser preenchida com uma chave aleatória antes da inicialização.
 
 | Variável | Descrição |
 |---|---|

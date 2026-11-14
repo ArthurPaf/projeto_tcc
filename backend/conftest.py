@@ -1,4 +1,4 @@
-"""Banco exclusivo dos testes e cliente compartilhado, como no Encontro 14."""
+"""Banco exclusivo dos testes e fixture do cliente HTTP."""
 import os
 from pathlib import Path
 

@@ -1,4 +1,4 @@
-"""Regressões encontradas na revisão da rubrica e limites da API real."""
+"""Testes de validação e limites dos endpoints."""
 from datetime import timedelta
 
 import jwt

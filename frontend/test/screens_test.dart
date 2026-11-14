@@ -778,7 +778,7 @@ void main() {
     expect(find.byType(EventoScreen), findsOneWidget);
   });
 
-  // A busca e os avisos, preservados do projeto da biblioteca.
+  // Busca e mensagens de resultado das operações.
   testWidgets('a busca pede à API só os eventos com o texto no nome', (
     tester,
   ) async {
