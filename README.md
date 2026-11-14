@@ -210,7 +210,10 @@ docker build -t eventos-api ./backend
 Provisione um banco PostgreSQL persistente e configure no serviço da API:
 
 - `DATABASE_URL`: URL privada do PostgreSQL fornecida pela hospedagem.
-  O projeto aceita `postgresql://` e normaliza `postgres://`.
+  O projeto normaliza `postgres://`, `postgresql://` e `postgresql+psycopg://`
+  para `postgresql+psycopg2://`, selecionando o driver instalado. A API e as
+  migrações usam essa mesma configuração; host, banco, senha e parâmetros
+  da URL são preservados.
 - `SECRET_KEY`: chave aleatória própria, diferente da usada localmente.
 - `ENDERECO_DO_APP`: origem HTTPS exata do app, sem barra final, conforme
   o tutorial do professor.
